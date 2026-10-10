@@ -1,0 +1,6 @@
+/.tools/
+/desktop/**/bin/
+/desktop/**/obj/
+/desktop/artifacts/
+/.vs/
+*.user

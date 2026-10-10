@@ -1,0 +1,38 @@
+<ui:FluentWindow x:Class="AccountManagement.Views.LoginWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+ Title="登录 · 帐号管理" Width="820" Height="620" ResizeMode="NoResize"
+ WindowStartupLocation="CenterScreen" ExtendsContentIntoTitleBar="True" FontFamily="Microsoft YaHei UI">
+ <Grid Background="#F7F9FC">
+  <Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition/></Grid.RowDefinitions>
+  <ui:TitleBar Title="帐号管理" ShowMaximize="False"/>
+  <Grid Grid.Row="1" Margin="32,24,32,30">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="270"/><ColumnDefinition Width="36"/><ColumnDefinition/></Grid.ColumnDefinitions>
+   <Border Background="#173C69" CornerRadius="14" Padding="26">
+    <StackPanel VerticalAlignment="Center">
+     <Border Background="#2C5685" Width="56" Height="56" CornerRadius="16" HorizontalAlignment="Left">
+      <TextBlock Text="A" Foreground="White" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+     </Border>
+     <TextBlock Text="帐号有序，&#10;随时可用。" Foreground="White" FontSize="29" FontWeight="SemiBold" Margin="0,26,0,18"/>
+     <TextBlock Text="集中整理平台与帐号，&#10;快速找到你需要的登录信息。" Foreground="#CDDCEF" FontSize="13" LineHeight="24"/>
+    </StackPanel>
+   </Border>
+   <StackPanel Grid.Column="2" VerticalAlignment="Center">
+    <TextBlock Text="欢迎回来" FontSize="26" FontWeight="SemiBold"/>
+    <TextBlock Text="使用你的帐号登录" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,16"/>
+    <StackPanel x:Name="Fields">
+     <TextBlock Text="服务地址" Style="{StaticResource FieldLabel}"/>
+     <ui:TextBox x:Name="EndpointBox" Text="http://127.0.0.1:18082" AutomationProperties.Name="服务地址"/>
+     <TextBlock Text="用户名" Style="{StaticResource FieldLabel}"/>
+     <ui:TextBox x:Name="UsernameBox" MaxLength="100" AutomationProperties.Name="用户名"/>
+     <TextBlock Text="登录密码" Style="{StaticResource FieldLabel}"/>
+     <PasswordBox x:Name="PasswordInput" MaxLength="256" Padding="10" AutomationProperties.Name="登录密码"/>
+     <ui:Button x:Name="LoginButton" Content="登 录" Appearance="Primary" HorizontalAlignment="Stretch" Margin="0,22,0,0" IsDefault="True" Click="Login_Click"/>
+    </StackPanel>
+    <TextBlock x:Name="Notice" TextWrapping="Wrap" Foreground="#9F3A38" FontSize="12" Margin="0,12,0,0"/>
+    <TextBlock Text="管理员可查看你保存的平台帐号和密码。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,14,0,0"/>
+   </StackPanel>
+  </Grid>
+ </Grid>
+</ui:FluentWindow>

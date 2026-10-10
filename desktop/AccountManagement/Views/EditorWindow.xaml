@@ -1,0 +1,54 @@
+<ui:FluentWindow x:Class="AccountManagement.Views.EditorWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+ Width="530" Height="680" MinHeight="460" ResizeMode="CanResize" WindowStartupLocation="CenterOwner"
+ ExtendsContentIntoTitleBar="True" FontFamily="Microsoft YaHei UI">
+ <Grid Background="#FAFBFD">
+  <Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ui:TitleBar x:Name="WindowTitle" ShowMaximize="False"/>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+   <StackPanel Margin="28,18,28,16">
+    <TextBlock x:Name="Heading" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <StackPanel x:Name="Fields">
+     <StackPanel x:Name="PlatformPanel" Visibility="Collapsed">
+      <TextBlock Text="平台名称 *" Style="{StaticResource FieldLabel}"/>
+      <ui:TextBox x:Name="PlatformNameBox" MaxLength="120" AutomationProperties.Name="平台名称"/>
+      <TextBlock Text="平台网址" Style="{StaticResource FieldLabel}"/>
+      <ui:TextBox x:Name="UrlBox" MaxLength="1000" PlaceholderText="https://example.com"/>
+     </StackPanel>
+     <StackPanel x:Name="AccountPanel" Visibility="Collapsed">
+      <TextBlock Text="所属平台 *" Style="{StaticResource FieldLabel}"/>
+      <ComboBox x:Name="PlatformPicker" DisplayMemberPath="Name" SelectedValuePath="Id" HorizontalContentAlignment="Stretch" AutomationProperties.Name="所属平台"/>
+      <TextBlock Text="帐号名称" Style="{StaticResource FieldLabel}"/>
+      <ui:TextBox x:Name="AccountNameBox" MaxLength="120" PlaceholderText="例如：公司生产环境（选填）"/>
+      <TextBlock Text="登录帐号 *" Style="{StaticResource FieldLabel}"/>
+      <ui:TextBox x:Name="LoginBox" MaxLength="160" PlaceholderText="用户名、手机号或邮箱"/>
+      <TextBlock Text="平台密码" Style="{StaticResource FieldLabel}"/>
+      <CheckBox x:Name="ReplacePassword" Content="修改已保存的密码（留空表示清空）" Margin="0,0,0,8" Checked="ReplacePassword_Changed" Unchecked="ReplacePassword_Changed"/>
+      <PasswordBox x:Name="AccountPassword" MaxLength="1024" Padding="10" AutomationProperties.Name="平台密码"/>
+      <TextBlock x:Name="PasswordHint" Text="可留空，适用于验证码或扫码登录。" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+      <TextBlock Text="备注" Style="{StaticResource FieldLabel}"/>
+      <ui:TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="95" VerticalScrollBarVisibility="Auto" MaxLength="2000"/>
+     </StackPanel>
+     <StackPanel x:Name="ChangePasswordPanel" Visibility="Collapsed">
+      <TextBlock Text="修改成功后，所有设备都需要重新登录。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+      <TextBlock Text="原登录密码" Style="{StaticResource FieldLabel}"/>
+      <PasswordBox x:Name="OldPassword" Padding="10" MaxLength="256"/>
+      <TextBlock Text="新登录密码（至少 6 位）" Style="{StaticResource FieldLabel}"/>
+      <PasswordBox x:Name="NewPassword" Padding="10" MaxLength="256"/>
+      <TextBlock Text="再次输入新密码" Style="{StaticResource FieldLabel}"/>
+      <PasswordBox x:Name="ConfirmPassword" Padding="10" MaxLength="256"/>
+     </StackPanel>
+    </StackPanel>
+    <TextBlock x:Name="ErrorText" Foreground="#A33838" TextWrapping="Wrap" Margin="0,16,0,0"/>
+   </StackPanel>
+  </ScrollViewer>
+  <Border Grid.Row="2" Background="White" BorderBrush="#E5EAF0" BorderThickness="0,1,0,0" Padding="24,14">
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    <ui:Button x:Name="CancelButton" Content="取消" Width="80" Margin="0,0,10,0" IsCancel="True" Click="Cancel_Click"/>
+    <ui:Button x:Name="SaveButton" Content="保存" Width="100" Appearance="Primary" Click="Save_Click"/>
+   </StackPanel>
+  </Border>
+ </Grid>
+</ui:FluentWindow>
