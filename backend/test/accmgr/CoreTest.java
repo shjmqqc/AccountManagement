@@ -62,6 +62,16 @@ public final class CoreTest {
         }
         // A new service instance sees persisted JDBC data, with the same key.
         Service restarted = new Service(db, new Crypto(key));
+        try (ApiServer allInterfaces = new ApiServer(service, "0.0.0.0", 0)) {
+            check(allInterfaces.address().getAddress().isAnyLocalAddress(), "Configurable wildcard HTTP binding");
+            allInterfaces.start(); port = allInterfaces.port();
+            request("GET", "/health", null, null, 200);
+        }
+        try (ApiServer loopback = new ApiServer(service, 0)) {
+            check(loopback.address().getAddress().isLoopbackAddress(), "Legacy constructor remains loopback-only");
+        }
+        try { new ApiServer(service, " ", 0); throw new AssertionError("Empty bind host accepted"); }
+        catch (IllegalArgumentException expected) { checks++; }
         Object login = restarted.execute("POST", "/api/login", null, body("username", "管理员", "password", "654321"), Collections.emptyMap());
         String token = (String) ((Map<?, ?>) login).get("token");
         List<?> accounts = (List<?>) restarted.execute("GET", "/api/accounts", token, new JsonObject(), Collections.emptyMap());

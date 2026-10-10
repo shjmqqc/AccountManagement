@@ -16,8 +16,13 @@ final class ApiServer implements AutoCloseable {
     private final Service service;
 
     ApiServer(Service service, int port) throws IOException {
+        this(service, "127.0.0.1", port);
+    }
+
+    ApiServer(Service service, String host, int port) throws IOException {
         this.service = service;
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 32);
+        if (host == null || host.trim().isEmpty()) throw new IllegalArgumentException("Empty HTTP host");
+        server = HttpServer.create(new InetSocketAddress(host.trim(), port), 32);
         executor = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<Runnable>(32), new ThreadPoolExecutor.CallerRunsPolicy());
         server.setExecutor(executor);
@@ -26,6 +31,7 @@ final class ApiServer implements AutoCloseable {
 
     void start() { server.start(); }
     int port() { return server.getAddress().getPort(); }
+    InetSocketAddress address() { return server.getAddress(); }
     public void close() { server.stop(0); executor.shutdownNow(); }
 
     private void handle(HttpExchange exchange) throws IOException {

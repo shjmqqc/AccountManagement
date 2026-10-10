@@ -18,3 +18,18 @@ public sealed record LoginResult(string Token, long ExpiresAt, bool MustChangePa
 public sealed record SavedSession(string Endpoint, string Username, string Token, long ExpiresAt);
 public sealed record PasswordResult(string Password);
 public sealed record IdResult(string Id);
+
+public sealed record ManagedUser(string Id, string Username, string Role, int Active, int MustChangePassword, long CreatedAt, int AccountCount)
+{
+    public string RoleText => Role == "admin" ? "管理员" : "普通用户";
+    public string StateText => Active == 0 ? "已停用" : MustChangePassword != 0 ? "待修改临时密码" : "正常";
+}
+public sealed record InvitationRecord(string Id, long CreatedAt, long ExpiresAt, string Status, string? UsedBy)
+{
+    public string StateText => Status switch { "available" => "可使用", "used" => "已使用", "revoked" => "已撤销", _ => "已过期" };
+    public string CreatedText => DateTimeOffset.FromUnixTimeMilliseconds(CreatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    public string ExpiresText => DateTimeOffset.FromUnixTimeMilliseconds(ExpiresAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+}
+public sealed record InvitationResult(string Id, string InviteCode, long ExpiresAt);
+public sealed record ResetResult(string TemporaryPassword, bool MustChangePassword);
+public sealed record AdminData<T>(UserRecord User, T Data);

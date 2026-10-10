@@ -1,0 +1,23 @@
+<ui:FluentWindow x:Class="AccountManagement.Views.RegisterWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+ Title="邀请注册" Width="540" Height="660" ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+ ExtendsContentIntoTitleBar="True" FontFamily="Microsoft YaHei UI">
+ <Grid Background="#F7F9FC"><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition/></Grid.RowDefinitions>
+  <ui:TitleBar Title="邀请注册" ShowMaximize="False"/>
+  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="30,20,30,26">
+   <TextBlock Text="加入帐号管理" FontSize="25" FontWeight="SemiBold"/>
+   <TextBlock Text="填写管理员发放的邀请码，设置自己的登录信息。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,6"/>
+   <StackPanel x:Name="Fields">
+    <TextBlock Text="邀请码" Style="{StaticResource FieldLabel}"/><ui:TextBox x:Name="InviteBox" MaxLength="43" AutomationProperties.Name="邀请码"/>
+    <TextBlock Text="用户名（注册后不可修改）" Style="{StaticResource FieldLabel}"/><ui:TextBox x:Name="UsernameBox" MaxLength="100" AutomationProperties.Name="注册用户名"/>
+    <TextBlock Text="登录密码（至少 6 位）" Style="{StaticResource FieldLabel}"/><PasswordBox x:Name="PasswordInput" MaxLength="256" Padding="10"/>
+    <TextBlock Text="确认登录密码" Style="{StaticResource FieldLabel}"/><PasswordBox x:Name="ConfirmInput" MaxLength="256" Padding="10"/>
+    <ui:Button Content="注册帐号" Appearance="Primary" Background="#0067C0" Foreground="White" HorizontalAlignment="Stretch" Margin="0,24,0,0" IsDefault="True" Click="Register_Click"/>
+   </StackPanel>
+   <TextBlock x:Name="Notice" TextWrapping="Wrap" Foreground="#9F3A38" Margin="0,14,0,0"/>
+   <TextBlock Text="管理员可查看你保存的平台帐号和密码。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,0"/>
+  </StackPanel></ScrollViewer>
+ </Grid>
+</ui:FluentWindow>

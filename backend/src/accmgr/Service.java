@@ -42,6 +42,10 @@ final class Service {
             limitLogin();
             return login(body);
         }
+        if (path.equals("/api/register") && method.equals("POST")) {
+            limitLogin();
+            return new AdminService(this).register(db, body);
+        }
         try (Connection c = db.connections.open()) {
             c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             c.setAutoCommit(false);
@@ -52,7 +56,10 @@ final class Service {
                         && !path.equals("/api/password") && !path.equals("/api/logout"))
                     throw new Problem(403, "password_change_required");
                 Object result;
-                if (path.equals("/api/me") && method.equals("GET")) {
+                if (path.startsWith("/api/admin/")) {
+                    if (!"admin".equals(user.get("role"))) throw new Problem(403, "admin_required");
+                    result = new AdminService(this).execute(c, owner, method, path, body, query);
+                } else if (path.equals("/api/me") && method.equals("GET")) {
                     result = object("id", owner, "username", user.get("username"), "role", user.get("role"));
                 } else if (path.equals("/api/logout") && method.equals("POST")) {
                     update(c, "DELETE FROM am_sessions WHERE token_hash=?", Crypto.digest(token));
@@ -62,6 +69,8 @@ final class Service {
                     String password = text(body, "new_password", 6, 256);
                     if (!Crypto.verifyPassword(oldPassword, (String) user.get("password_hash")))
                         throw new Problem(400, "incorrect_password");
+                    if (number(user, "must_change_password") != 0 && oldPassword.equals(password))
+                        throw new Problem(400, "new_password_must_differ");
                     update(c, "UPDATE am_users SET password_hash=?,must_change_password=0 WHERE id=?",
                             Crypto.hashPassword(password), owner);
                     update(c, "DELETE FROM am_sessions WHERE user_id=?", owner);
@@ -151,7 +160,7 @@ final class Service {
         return user;
     }
 
-    private Object platforms(Connection c, String owner, String method, JsonObject body) throws Exception {
+    Object platforms(Connection c, String owner, String method, JsonObject body) throws Exception {
         if (method.equals("GET")) return rows(c,
                 "SELECT p.id,p.name,p.url,p.created_at,p.updated_at,"
                 + "(SELECT COUNT(*) FROM am_accounts a WHERE a.platform_id=p.id) AS account_count "
@@ -164,7 +173,7 @@ final class Service {
         return object("id", platformId);
     }
 
-    private Object platform(Connection c, String owner, String platformId, String method, JsonObject body) throws Exception {
+    Object platform(Connection c, String owner, String platformId, String method, JsonObject body) throws Exception {
         Map<String, Object> record = ownedPlatform(c, owner, platformId);
         if (method.equals("GET")) return record;
         if (method.equals("PUT")) {
@@ -185,7 +194,7 @@ final class Service {
         return record;
     }
 
-    private Object accounts(Connection c, String owner, String method, JsonObject body, Map<String, String> query) throws Exception {
+    Object accounts(Connection c, String owner, String method, JsonObject body, Map<String, String> query) throws Exception {
         if (method.equals("GET")) {
             String search = checked(query.getOrDefault("q", ""), 0, 200).toLowerCase(Locale.ROOT);
             List<Map<String, Object>> results = rows(c,
@@ -212,7 +221,7 @@ final class Service {
         return object("id", accountId);
     }
 
-    private Object account(Connection c, String owner, String accountId, String method, JsonObject body, boolean reveal) throws Exception {
+    Object account(Connection c, String owner, String accountId, String method, JsonObject body, boolean reveal) throws Exception {
         Map<String, Object> record = one(c,
                 "SELECT id,platform_id,name,login,notes,password_cipher,created_at,updated_at "
                 + "FROM am_accounts WHERE id=? AND owner_id=?", accountId, owner);
@@ -260,7 +269,7 @@ final class Service {
         return value;
     }
 
-    private static String id(String value) {
+    static String id(String value) {
         if (!value.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))
             throw new Problem(404, "not_found");
         return value;
@@ -283,7 +292,7 @@ final class Service {
         return value;
     }
 
-    private static long number(Map<String, Object> row, String field) { return ((Number) row.get(field)).longValue(); }
+    static long number(Map<String, Object> row, String field) { return ((Number) row.get(field)).longValue(); }
 
     static Map<String, Object> object(Object... pairs) {
         Map<String, Object> result = new LinkedHashMap<>();

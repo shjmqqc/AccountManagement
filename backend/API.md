@@ -1,8 +1,8 @@
-# 核心 API（第一阶段）
+# 帐号管理 API（含邀请与管理员接口）
 
-JSON 使用 UTF-8。除 POST /api/login 和 GET /health 外均需 `Authorization: Bearer <token>`。
+JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外均需 `Authorization: Bearer <token>`。
 成功返回 HTTP 200，失败返回 `{"error":"错误码"}`。时间为 Unix 毫秒，记录 ID 为 UUID。
-列表/详情不返回密码或密文；密码仅通过独立 POST 接口读取。服务端从令牌确定所有者，不接受客户端指定 owner_id。
+列表/详情不返回密码或密文；密码仅通过独立 POST 接口读取。本人接口从令牌确定所有者；管理员只能通过下列专用接口指定要查看的用户，不能借此修改他人的业务数据。
 
 | 方法 | 路径 | 请求/行为 |
 |---|---|---|
@@ -27,6 +27,55 @@ JSON 使用 UTF-8。除 POST /api/login 和 GET /health 外均需 `Authorization
 
 错误状态：400 输入无效，401 登录无效/过期，403 必须改密或浏览器来源不允许，404 不存在或不属于本人，405 方法不支持，409 重复记录/非空平台，413 请求体过大，415 非 JSON 请求体，429 登录频率过高，500 服务端异常。
 
-强制改密会话只能改密或退出。重置密码及管理员操作接口留待下一阶段；禁止客户端通过直接数据库写入来代替这些接口。
+强制改密会话只能改密或退出；新密码不能与临时密码相同，否则返回 400 `new_password_must_differ`。改密成功后需要重新登录。
+
+## 邀请注册
+
+`POST /api/register` 无需登录。请求：
+
+```json
+{"invite_code":"管理员发放的43字符邀请码","username":"同事用户名","password":"至少6位"}
+```
+
+成功返回 `{"id":"用户UUID","login_required":true}`，随后调用登录接口。注册永远创建普通用户，不能指定管理员身份。用户名去除首尾空白，注册后不可修改。
+
+邀请码只使用一次、创建后 7 天过期。不存在、过期、撤销或已使用均返回 400 `invalid_invitation`；用户名重复返回 409 `username_taken`，邀请码不会被消耗。校验失败和数据库失败也不会消耗邀请码。并发使用同一邀请码只允许一次成功。注册与登录共享每进程每分钟 60 次尝试限额，超限返回 429 `too_many_login_attempts`。
+
+## 管理员接口
+
+所有 `/api/admin/` 接口要求有效管理员会话。普通用户返回 403 `admin_required`；停用、过期或已撤销的会话返回 401。强制改密中的会话不可使用管理接口。
+
+| 方法 | 路径 | 请求 / 返回 |
+|---|---|---|
+| POST | /api/admin/invitations | 无请求字段；返回 id、invite_code、expires_at |
+| GET | /api/admin/invitations | 邀请元数据数组，含 id、created_by、created_at、expires_at、revoked_at、used_at、used_by、status |
+| POST | /api/admin/invitations/{id}/revoke | 撤销未使用邀请；重复撤销成功，已使用返回 409 invitation_used |
+| GET | /api/admin/users | 用户数组：id、username、role、active、must_change_password、created_at、account_count |
+| POST | /api/admin/users/{userId}/status | 必填 JSON 布尔值 active：false 停用、true 恢复；返回 ok |
+| POST | /api/admin/users/{userId}/reset-password | 无请求字段；返回 temporary_password、must_change_password:true |
+| GET | /api/admin/users/{userId}/platforms | 指定用户的平台列表 |
+| GET | /api/admin/users/{userId}/platforms/{id} | 指定用户的平台详情 |
+| GET | /api/admin/users/{userId}/accounts | 指定用户的帐号列表；支持 q / platform_id，与本人搜索规则相同 |
+| GET | /api/admin/users/{userId}/accounts/{id} | 指定用户的帐号详情，不含密码 |
+| POST | /api/admin/users/{userId}/accounts/{id}/password | 必填 action：view 或 copy；返回该用户帐号密码 |
+| GET | /api/admin/audit-logs | 操作记录数组，含 id、actor_id、target_user_id、target_id、action、outcome、created_at |
+
+邀请列表 status 为 available / used / revoked / expired；未使用或未撤销的时间为 0，used_by 为 null。邀请码只在创建响应中返回一次，后端仅存摘要；复制并手动发放，遗失时撤销并创建新邀请。临时密码同样只在重置响应中返回一次，后端只存密码哈希。
+
+邀请列表与审计列表支持 `limit=1..200`，默认 100，按 created_at 和 id 倒序。下一页用上一页最后一条 id 作为 `before_id`；无更多记录返回空数组。游标不存在返回 400 `invalid_cursor`。返回字段中的 active / must_change_password 是 0 或 1；登录响应的 must_change_password 是布尔值。
+
+停用立即删除该用户全部会话；恢复不恢复旧会话。重置生成随机 20 字符临时密码、清除登录失败锁定、撤销全部会话并强制改密，不改变平台密码密文。对已停用用户重置不会恢复启用。管理员帐号禁止被停用或重置，返回 409 `admin_account_protected`；管理员自己的改密使用 `/api/password`。
+
+他人数据查询和密码接口统一返回所属用户，便于客户端明确显示当前正在查看谁的数据：
+
+```json
+{"user":{"id":"用户UUID","username":"同事","role":"user","active":1},"data":{"password":"平台密码"}}
+```
+
+列表的 data 是数组，详情的 data 是对象。被停用用户的数据仍可供管理员查看。userId 与记录所属者必须一致，否则 404；管理路径的业务写操作返回 405，本人路径仍维持原来的所有者隔离。
+
+审计记录邀请创建/撤销、平台和帐号读取、密码 view/copy、用户停用/恢复、密码重置的成功或失败。action 对应 invitation_create、invitation_revoke、platform_read、account_read、password_view、password_copy、user_disable、user_enable、password_reset；outcome 为 success 或 failure。日志仅保存固定操作类型、UUID 和时间，不包含邀请码、临时密码、平台密码、请求正文或异常内容。鉴权失败、无效路由/字段、用户与邀请列表查询、审计列表查询不记录为管理操作。view/copy 表示客户端声明的用途，无法证明操作系统剪贴板写入成功。
+
+成功操作和审计在同一事务中提交，审计失败则不提交管理变更、不返回密码；业务失败先回滚，再记录 failure。客户端超时不能据此判断服务端一定未提交：邀请可在列表核对，密码重置响应遗失后可再次重置获得新的临时密码。
 
 首次联调建议只使用虚构帐号和密码。通过接口创建平台和帐号后，退出并重新登录、重启该独立服务，再查看记录和读取密码，确认持久化与解密正常；不得重启旧业务来执行测试。

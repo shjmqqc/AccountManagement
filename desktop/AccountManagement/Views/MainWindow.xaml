@@ -16,7 +16,7 @@
   <ui:TitleBar Title="帐号管理"/>
   <Grid Grid.Row="1" Margin="26,12,26,18" IsEnabled="{Binding IsIdle}">
    <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel VerticalAlignment="Center"><TextBlock Text="我的帐号库" FontSize="25" FontWeight="SemiBold"/><TextBlock Text="平台与登录信息，集中整理" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/></StackPanel>
+   <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding LibraryTitle}" ToolTip="{Binding LibraryTitle}" TextTrimming="CharacterEllipsis" FontSize="23" FontWeight="SemiBold"/><TextBlock Text="{Binding LibrarySubtitle}" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/></StackPanel>
    <Grid Grid.Column="1" Margin="14,6,26,4">
     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <ui:TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索平台、帐号名称、登录帐号或备注" MaxLength="200" VerticalAlignment="Center" AutomationProperties.Name="搜索全部帐号">
@@ -25,6 +25,8 @@
     <ui:Button x:Name="SearchButton" Grid.Column="1" Content="搜索" Command="{Binding SearchCommand}" Appearance="Primary" Background="#0067C0" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center"/>
    </Grid>
    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+    <ui:Button Content="返回本人数据" Click="ReturnOwn_Click" Visibility="{Binding IsReadOnly, Converter={StaticResource BoolVisibility}}" Margin="0,0,8,0"/>
+    <ui:Button x:Name="AdminButton" Content="管理" Click="Admin_Click" Visibility="{Binding IsAdmin, Converter={StaticResource BoolVisibility}}" Margin="0,0,8,0"/>
     <TextBlock Text="{Binding Identity}" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
     <ui:Button Content="帐户 ▾" Click="UserMenu_Click">
      <ui:Button.ContextMenu><ContextMenu><MenuItem Header="修改登录密码" Click="ChangePassword_Click"/><Separator/><MenuItem Header="退出登录" Click="Logout_Click"/></ContextMenu></ui:Button.ContextMenu>
@@ -36,18 +38,18 @@
    <Border Background="#EAF0F8" CornerRadius="12" Padding="12,18,12,12">
     <Grid>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <DockPanel Margin="8,0"><ui:Button DockPanel.Dock="Right" Content="＋" ToolTip="新增平台" Click="AddPlatform_Click" Padding="9,3"/><TextBlock Text="平台" Style="{StaticResource PanelHeading}" VerticalAlignment="Center"/></DockPanel>
+     <DockPanel Margin="8,0"><ui:Button DockPanel.Dock="Right" Content="＋" ToolTip="新增平台" Click="AddPlatform_Click" Padding="9,3" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="平台" Style="{StaticResource PanelHeading}" VerticalAlignment="Center"/></DockPanel>
      <ListBox x:Name="PlatformList" Grid.Row="2" ItemsSource="{Binding Platforms}" SelectedItem="{Binding SelectedPlatform}" SelectionChanged="Platform_SelectionChanged" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="平台列表">
       <ListBox.ItemTemplate><DataTemplate><Grid Margin="5,9"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding AccountCount}" Style="{StaticResource ListSubtitle}" Margin="8,0,2,0"/></Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
-     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="4,12,0,0"><ui:Button Content="编辑平台" Click="EditPlatform_Click" Padding="9,6"/><ui:Button Content="删除" Click="DeletePlatform_Click" Margin="6,0,0,0" Padding="9,6"/></StackPanel>
+     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="4,12,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"><ui:Button Content="编辑平台" Click="EditPlatform_Click" Padding="9,6"/><ui:Button Content="删除" Click="DeletePlatform_Click" Margin="6,0,0,0" Padding="9,6"/></StackPanel>
     </Grid>
    </Border>
    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
    <Border Grid.Column="2" Background="White" CornerRadius="12" BorderBrush="#E2E8F0" BorderThickness="1" Padding="16,18,16,12">
     <Grid>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition/></Grid.RowDefinitions>
-     <DockPanel><ui:Button DockPanel.Dock="Right" Content="＋ 新增" Click="AddAccount_Click" Padding="10,5"/><TextBlock Text="{Binding ListTitle}" Style="{StaticResource PanelHeading}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/></DockPanel>
+     <DockPanel><ui:Button DockPanel.Dock="Right" Content="＋ 新增" Click="AddAccount_Click" Padding="10,5" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="{Binding ListTitle}" Style="{StaticResource PanelHeading}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/></DockPanel>
      <ListBox x:Name="AccountList" Grid.Row="2" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="帐号列表">
       <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="4,12"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Subtitle}" Style="{StaticResource ListSubtitle}" FontSize="11" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
@@ -60,7 +62,7 @@
      <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"><StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding HasSelection}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style><TextBlock Text="选择一个帐号" FontSize="22" FontWeight="SemiBold" TextAlignment="Center"/><TextBlock Text="查看登录信息、备注和密码" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0"/></StackPanel>
      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,12,0" Visibility="{Binding HasSelection, Converter={StaticResource BoolVisibility}}">
       <StackPanel>
-       <DockPanel><ui:Button DockPanel.Dock="Right" Content="编辑" Click="EditAccount_Click" Margin="12,0,0,0"/><TextBlock Text="{Binding SelectedAccount.DisplayName}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
+       <DockPanel><ui:Button x:Name="EditAccountButton" DockPanel.Dock="Right" Content="编辑" Click="EditAccount_Click" Margin="12,0,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="{Binding SelectedAccount.DisplayName}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
        <TextBlock Text="{Binding DetailPlatform}" Foreground="#3269A5" Margin="0,8,0,14"/>
        <TextBlock Text="平台网址" Style="{StaticResource FieldLabel}"/>
        <DockPanel><ui:Button DockPanel.Dock="Right" Content="打开" Click="OpenUrl_Click" Padding="10,4" Margin="8,0,0,0"/><TextBlock Text="{Binding DetailUrl}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DetailUrl}" VerticalAlignment="Center"/></DockPanel>
@@ -74,7 +76,7 @@
        <TextBlock Text="{Binding SelectedAccount.Notes}" TextWrapping="Wrap" MinHeight="55" LineHeight="23"/>
        <Separator Margin="0,22,0,12" Background="#E7ECF3"/>
        <TextBlock Text="{Binding SelectedAccount.UpdatedText, StringFormat=更新时间：{0}}" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
-       <ui:Button Content="删除帐号" Click="DeleteAccount_Click" Margin="0,18,0,0" Foreground="#A33838" HorizontalAlignment="Left"/>
+       <ui:Button x:Name="DeleteAccountButton" Content="删除帐号" Click="DeleteAccount_Click" Margin="0,18,0,0" Foreground="#A33838" HorizontalAlignment="Left" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/>
       </StackPanel>
      </ScrollViewer>
     </Grid>

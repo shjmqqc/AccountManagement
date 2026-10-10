@@ -25,10 +25,20 @@ public partial class MainWindow : FluentWindow
         ViewModel.SessionExpired += () => EndSession("登录已失效，请重新登录。");
         if (loadOnOpen) Loaded += async (_, _) => await ViewModel.RefreshCommand.ExecuteAsync(null);
         Deactivated += (_, _) => ViewModel.HidePassword();
-        Closed += (_, _) => ViewModel.ClearData();
+        Closed += (_, _) => { ended = true; ViewModel.ClearData(); };
     }
 
     private void EndSession(string notice) { if (ended) return; ended = true; SignedOut?.Invoke(notice); }
+    private async void Admin_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.IsAdmin || ViewModel.IsBusy) return;
+        ViewModel.HidePassword();
+        var dialog = new AdminWindow(api) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.SessionExpired) { EndSession("登录已失效，请重新登录。"); return; }
+        if (dialog.ViewUser is { } user) await ViewModel.SwitchUserAsync(user.Id == ViewModel.User.Id ? null : user);
+    }
+    private async void ReturnOwn_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchUserAsync(null);
     private async void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is null || ViewModel.IsBusy || ViewModel.SelectedPlatform is null) return;
@@ -42,7 +52,7 @@ public partial class MainWindow : FluentWindow
 
     private async Task EditAsync(EditorKind kind, PlatformRecord? platform = null, AccountRecord? account = null)
     {
-        if (ViewModel.IsBusy) return;
+        if (ViewModel.IsBusy || ViewModel.IsReadOnly && kind != EditorKind.ChangePassword) return;
         ViewModel.HidePassword();
         var dialog = new EditorWindow(api, kind, ViewModel.Platforms, platform, account) { Owner = this };
         dialog.ShowDialog();
@@ -75,6 +85,7 @@ public partial class MainWindow : FluentWindow
 
     private async void DeletePlatform_Click(object sender, RoutedEventArgs e)
     {
+        if (ViewModel.IsReadOnly || ViewModel.IsBusy) return;
         if (ViewModel.SelectedPlatform is not { Id.Length: > 0 } platform) { ViewModel.Status = "请先选择一个具体平台。"; return; }
         if (platform.AccountCount > 0) { ViewModel.Status = "平台内还有帐号，请先删除其中的帐号。"; return; }
         if (System.Windows.MessageBox.Show(this, $"删除平台“{platform.Name}”？此操作无法撤销。", "删除平台", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
@@ -82,6 +93,7 @@ public partial class MainWindow : FluentWindow
     }
     private async void DeleteAccount_Click(object sender, RoutedEventArgs e)
     {
+        if (ViewModel.IsReadOnly || ViewModel.IsBusy) return;
         if (ViewModel.SelectedAccount is not { } account) return;
         ViewModel.HidePassword();
         if (System.Windows.MessageBox.Show(this, $"删除帐号“{account.DisplayName}”？此操作无法撤销。", "删除帐号", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;

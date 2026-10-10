@@ -62,14 +62,17 @@ public final class Main {
         // Fail before binding if schema/key configuration is unusable.
         try (Connection c = db.connections.open()) {
             Database.rows(c, "SELECT token_hash FROM am_sessions WHERE 1=0");
+            Database.rows(c, "SELECT code_hash FROM am_invitations WHERE 1=0");
+            Database.rows(c, "SELECT action FROM am_audit_logs WHERE 1=0");
             Map<String, Object> sample = Database.one(c, "SELECT id,owner_id,password_cipher FROM am_accounts LIMIT 1");
             if (sample != null) crypto.decrypt((String) sample.get("password_cipher"), sample.get("owner_id") + ":" + sample.get("id"));
         }
         int port = Integer.parseInt(config.getProperty("http.port", "18082"));
         if (port < 1 || port > 65535) throw new IllegalArgumentException("Invalid HTTP port");
-        ApiServer server = new ApiServer(service, port);
+        String host = config.getProperty("http.host", "127.0.0.1").trim();
+        ApiServer server = new ApiServer(service, host, port);
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));
         server.start();
-        System.out.println("Core API listening on http://127.0.0.1:" + port + " (test data only until HTTPS integration)");
+        System.out.println("Core API listening on " + server.address() + " (HTTP; HTTPS can be terminated by Nginx)");
     }
 }

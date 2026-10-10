@@ -11,6 +11,21 @@ public partial class MainViewModel : ObservableObject
     private readonly ApiClient api;
     private int selectionVersion;
     public UserRecord User { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReadOnly), nameof(CanEdit), nameof(LibraryTitle), nameof(LibrarySubtitle))]
+    private ManagedUser? viewedUser;
+    public bool IsAdmin => User.Role == "admin";
+    public bool IsReadOnly => ViewedUser is not null;
+    public bool CanEdit => !IsReadOnly;
+    public string LibraryTitle => ViewedUser is null ? "我的帐号库" : $"{ViewedUser.Username} 的帐号库";
+    public string LibrarySubtitle => IsReadOnly ? "管理员只读查看 · 密码操作会记录审计" : "平台与登录信息，集中整理";
+
+    public Task<bool> SwitchUserAsync(ManagedUser? user) => RunAsync(async () =>
+    {
+        if (user is not null && !IsAdmin) throw new ArgumentException("此功能仅限管理员使用。");
+        ClearData(); SelectedPlatform = null; ViewedUser = user;
+        await ReloadAsync();
+    });
     public ObservableCollection<PlatformRecord> Platforms { get; } = [];
     public ObservableCollection<AccountRecord> Accounts { get; } = [];
     public event Action? SessionExpired;
@@ -69,7 +84,7 @@ public partial class MainViewModel : ObservableObject
     {
         HidePassword();
         var selectedId = selectPlatformId ?? SelectedPlatform?.Id ?? "";
-        var platforms = await api.PlatformsAsync();
+        var platforms = ViewedUser is null ? await api.PlatformsAsync() : await api.UserPlatformsAsync(ViewedUser.Id);
         Platforms.Clear();
         Platforms.Add(PlatformRecord.All with { AccountCount = platforms.Sum(p => p.AccountCount) });
         foreach (var platform in platforms) Platforms.Add(platform);
@@ -84,7 +99,8 @@ public partial class MainViewModel : ObservableObject
         SelectedAccount = null;
         Accounts.Clear();
         var query = SearchText.Trim();
-        var records = await api.AccountsAsync(query, SelectedPlatform?.Id);
+        var records = ViewedUser is null ? await api.AccountsAsync(query, SelectedPlatform?.Id)
+            : await api.UserAccountsAsync(ViewedUser.Id, query, SelectedPlatform?.Id);
         foreach (var account in records) Accounts.Add(account);
         ListTitle = query.Length > 0 ? $"搜索结果 · {records.Count}" : $"{SelectedPlatform?.Name ?? "全部帐号"} · {records.Count}";
         SelectedAccount = selectAccountId is null ? null : Accounts.FirstOrDefault(a => a.Id == selectAccountId);
@@ -99,7 +115,8 @@ public partial class MainViewModel : ObservableObject
         if (selected is null) return;
         await RunAsync(async () =>
         {
-            var password = await api.PasswordAsync(selected.Id);
+            var password = ViewedUser is null ? await api.PasswordAsync(selected.Id)
+                : await api.UserPasswordAsync(ViewedUser.Id, selected.Id, "view");
             if (version != selectionVersion || SelectedAccount?.Id != selected.Id) return;
             PasswordDisplay = password.Length == 0 ? "（未设置密码）" : password;
             PasswordVisible = true;
@@ -113,7 +130,8 @@ public partial class MainViewModel : ObservableObject
         if (selected is null) return;
         await RunAsync(async () =>
         {
-            var password = await api.PasswordAsync(selected.Id);
+            var password = ViewedUser is null ? await api.PasswordAsync(selected.Id)
+                : await api.UserPasswordAsync(ViewedUser.Id, selected.Id, "copy");
             if (version == selectionVersion && SelectedAccount?.Id == selected.Id) copy(password);
         }, "密码已复制");
     }

@@ -28,9 +28,9 @@ public sealed class ApiClient : IDisposable
     public static string ValidateEndpoint(string value)
     {
         if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri)
-            || !(uri.Scheme == "https" || uri.Scheme == "http" && uri.IsLoopback)
+            || !(uri.Scheme == "https" || uri.Scheme == "http")
             || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 || uri.AbsolutePath != "/")
-            throw new ArgumentException("服务地址须为 HTTPS 地址，或本机 HTTP 地址，例如 http://127.0.0.1:18082。");
+            throw new ArgumentException("服务地址须为 HTTP 或 HTTPS 根地址，例如 http://服务器IP:18082 或 https://你的域名。");
         return uri.AbsoluteUri;
     }
 
@@ -50,6 +50,24 @@ public sealed class ApiClient : IDisposable
     }
 
     public Task<UserRecord> MeAsync() => SendAsync<UserRecord>(HttpMethod.Get, "api/me");
+    public Task RegisterAsync(string inviteCode, string username, string password) => SendAsync<IdResult>(HttpMethod.Post, "api/register", new { inviteCode, username, password });
+    public Task<List<ManagedUser>> UsersAsync() => SendAsync<List<ManagedUser>>(HttpMethod.Get, "api/admin/users");
+    public Task<List<InvitationRecord>> InvitationsAsync(string? before = null) => SendAsync<List<InvitationRecord>>(HttpMethod.Get,
+        "api/admin/invitations?limit=100" + (before is null ? "" : "&before_id=" + Uri.EscapeDataString(before)));
+    public Task<InvitationResult> CreateInvitationAsync() => SendAsync<InvitationResult>(HttpMethod.Post, "api/admin/invitations");
+    public Task RevokeInvitationAsync(string id) => SendAsync<JsonElement>(HttpMethod.Post, $"api/admin/invitations/{id}/revoke");
+    public Task SetUserActiveAsync(string id, bool active) => SendAsync<JsonElement>(HttpMethod.Post, $"api/admin/users/{id}/status", new { active });
+    public Task<ResetResult> ResetPasswordAsync(string id) => SendAsync<ResetResult>(HttpMethod.Post, $"api/admin/users/{id}/reset-password");
+    public async Task<List<PlatformRecord>> UserPlatformsAsync(string id) =>
+        (await SendAsync<AdminData<List<PlatformRecord>>>(HttpMethod.Get, $"api/admin/users/{id}/platforms")).Data;
+    public async Task<List<AccountRecord>> UserAccountsAsync(string id, string search, string? platformId)
+    {
+        var query = !string.IsNullOrWhiteSpace(search) ? "?q=" + Uri.EscapeDataString(search.Trim())
+            : !string.IsNullOrEmpty(platformId) ? "?platform_id=" + Uri.EscapeDataString(platformId) : "";
+        return (await SendAsync<AdminData<List<AccountRecord>>>(HttpMethod.Get, $"api/admin/users/{id}/accounts" + query)).Data;
+    }
+    public async Task<string> UserPasswordAsync(string userId, string accountId, string action) =>
+        (await SendAsync<AdminData<PasswordResult>>(HttpMethod.Post, $"api/admin/users/{userId}/accounts/{accountId}/password", new { action })).Data.Password;
     public Task LogoutAsync() => SendAsync<JsonElement>(HttpMethod.Post, "api/logout");
     public Task ChangePasswordAsync(string oldPassword, string newPassword) => SendAsync<JsonElement>(HttpMethod.Post, "api/password", new { oldPassword, newPassword });
     public Task<List<PlatformRecord>> PlatformsAsync() => SendAsync<List<PlatformRecord>>(HttpMethod.Get, "api/platforms");
@@ -107,11 +125,17 @@ public sealed class ApiClient : IDisposable
         "login_required" => "登录已失效，请重新登录。",
         "password_change_required" => "请先修改临时登录密码。",
         "incorrect_password" => "原登录密码不正确。",
+        "invalid_invitation" => "邀请码无效、已使用、已撤销或已过期，请联系管理员。",
+        "username_taken" => "该用户名已被使用，请换一个用户名；邀请码仍可继续使用。",
+        "invitation_used" => "该邀请已被使用，不能撤销。请刷新列表。",
+        "admin_required" => "此功能仅限管理员使用。",
+        "admin_account_protected" => "不能停用或重置管理员帐号，请使用本人修改密码功能。",
+        "new_password_must_differ" => "新密码不能与临时密码相同。",
         "duplicate_record" => "已存在相同的平台名称，或该平台下已有此登录帐号。",
         "platform_not_empty" => "平台内还有帐号，请先删除其中的帐号。",
         "not_found" => "记录不存在或无权访问，请刷新后重试。",
         "invalid_url" => "平台网址须为完整的 http:// 或 https:// 地址。",
-        "too_many_login_attempts" => "登录尝试过于频繁，请稍后再试。",
+        "too_many_login_attempts" => "登录或注册尝试过于频繁，请稍后再试。",
         _ when status == 401 => "登录已失效，请重新登录。",
         _ when status == 400 => "填写内容不符合要求，请检查长度及必填项。",
         _ when status == 413 => "填写内容过长，请缩短后重试。",

@@ -8,8 +8,10 @@ namespace AccountManagement;
 
 public partial class App : Application
 {
-    private readonly ApiClient api = new();
-    private readonly SessionStore sessions = new();
+    private readonly ApiClient api;
+    private readonly SessionStore sessions;
+    public App() : this(new ApiClient(), new SessionStore()) { }
+    internal App(ApiClient api, SessionStore sessions) { this.api = api; this.sessions = sessions; }
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -33,7 +35,6 @@ public partial class App : Application
         var login = new LoginWindow(api, sessions, endpoint, username, notice);
         MainWindow = login;
         login.SignedIn += user => { OpenMain(user); login.Close(); };
-        login.Closed += (_, _) => { if (MainWindow == login) Shutdown(); };
         login.Show();
     }
 
@@ -51,7 +52,6 @@ public partial class App : Application
             OpenLogin(api.Endpoint, user.Username, notice);
             window.Close();
         };
-        window.Closed += (_, _) => { if (MainWindow == window) Shutdown(); };
         window.Show();
     }
     protected override void OnExit(ExitEventArgs e) { api.Dispose(); base.OnExit(e); }

@@ -30,6 +30,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Test compilation failed' }
     & "$Jdk/bin/java.exe" -Xmx128m -cp 'build/classes;build/test-classes;build/lib/*;build/test-lib/*' accmgr.CoreTest
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+    & "$Jdk/bin/java.exe" -Xmx128m -cp 'build/classes;build/test-classes;build/lib/*;build/test-lib/*' accmgr.AdminTest
+    if ($LASTEXITCODE -ne 0) { throw 'Admin tests failed' }
 }
 Write-Output 'Build complete: build/account-management.jar and build/lib/*.jar'
 New-Item -ItemType Directory -Force build/release/lib | Out-Null
@@ -37,6 +39,7 @@ Copy-Item build/account-management.jar build/release/
 Copy-Item build/lib/gson-2.13.2.jar,build/lib/mysql-connector-java-5.1.49.jar build/release/lib/
 Copy-Item config.example.properties,README.md,API.md build/release/
 Copy-Item ../database/002-core-schema.sql build/release/
+Copy-Item ../database/003-admin-schema.sql,UPGRADE.md build/release/
 Get-ChildItem build/release -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
     $relative = $_.FullName.Substring((Resolve-Path build/release).Path.Length + 1).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative

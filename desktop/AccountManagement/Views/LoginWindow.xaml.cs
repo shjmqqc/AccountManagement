@@ -20,6 +20,19 @@ public partial class LoginWindow : FluentWindow
         EndpointBox.Text = endpoint ?? api.Endpoint; UsernameBox.Text = username ?? ""; Notice.Text = notice ?? "";
     }
 
+    private void Register_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            api.Configure(EndpointBox.Text);
+            var dialog = new RegisterWindow(api) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.RegisteredUsername is { } username)
+            { UsernameBox.Text = username; PasswordInput.Clear(); Notice.Text = "注册成功，请使用刚设置的密码登录。"; }
+        }
+        catch (ArgumentException error) { Notice.Text = error.Message; }
+    }
+
     private async void Login_Click(object sender, RoutedEventArgs e)
     {
         if (!Fields.IsEnabled) return;

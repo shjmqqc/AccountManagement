@@ -19,6 +19,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--lifecycle") return LifecycleChecks.Run(args[1]);
         // Load styles without running production startup or reading the user's saved session.
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/AccountManagement;component/Styles.xaml") });
@@ -45,12 +46,13 @@ internal static class Program
 
     private static async Task Run(string endpoint)
     {
-        foreach (var bad in new[] { "http://example.com", "https://user:password@example.com", "https://example.com/api", "ftp://localhost", "https://example.com/?token=x" })
+        foreach (var bad in new[] { "https://user:password@example.com", "https://example.com/api", "ftp://localhost", "https://example.com/?token=x" })
         {
             try { ApiClient.ValidateEndpoint(bad); throw new Exception("Unsafe endpoint accepted"); }
             catch (ArgumentException) { checks++; }
         }
         Check(ApiClient.ValidateEndpoint("http://127.0.0.1:18083") == "http://127.0.0.1:18083/", "Loopback allowed");
+        Check(ApiClient.ValidateEndpoint("http://example.com:18082") == "http://example.com:18082/", "Remote HTTP allowed");
         Check(ApiClient.ValidateEndpoint("https://example.com") == "https://example.com/", "HTTPS allowed");
 
         string sessionDir = Path.GetFullPath("artifacts/test-session");
@@ -113,6 +115,7 @@ internal static class Program
         var editor = new EditorWindow(api, EditorKind.Account, vm.Platforms, account: account); Capture(editor, "edit-account", 530, 680); editor.Close();
         var platformEditor = new EditorWindow(api, EditorKind.Platform, platform: platform); Capture(platformEditor, "edit-platform", 530, 460); platformEditor.Close();
         var passwordEditor = new EditorWindow(api, EditorKind.ChangePassword); Capture(passwordEditor, "change-password", 530, 540); passwordEditor.Close();
+        await AdminFlow(api, me, other, endpoint, window);
         window.Close();
 
         // A late password response must not populate another selection.
@@ -132,6 +135,106 @@ internal static class Program
         foreach (var record in await api.PlatformsAsync()) await api.DeletePlatformAsync(record.Id);
         Check((await api.PlatformsAsync()).Count == 0, "Delete flow and cleanup");
         await api.LogoutAsync(); await ExpectApi(401, () => api.MeAsync());
+    }
+
+    private static async Task AdminFlow(ApiClient api, UserRecord me, ApiClient other, string endpoint, MainWindow window)
+    {
+        var management = new AdminViewModel(api);
+        string secret = "";
+        management.SecretReady += (_, value, _) => secret = value;
+        await management.RefreshCommand.ExecuteAsync(null);
+        Check(management.Users.Count == 2 && management.IsIdle, "Admin user list loaded");
+        management.SelectedUser = management.Users.Single(u => u.Id == me.Id);
+        Check(!management.CanManageUser, "Administrator reset and disable unavailable");
+        await management.CreateInviteCommand.ExecuteAsync(null);
+        Check(secret.Length == 43 && management.Invitations.Count == 1, "Create invitation and refresh list");
+        string invite = secret;
+        using var member = new ApiClient(); member.Configure(endpoint);
+        await member.RegisterAsync(invite, "invited-test", "member123");
+        await ExpectApi(400, () => member.RegisterAsync(invite, "used-invite", "member123"));
+        await member.LoginAsync("invited-test", "member123");
+        await ExpectApi(403, () => member.UsersAsync());
+        await ExpectApi(403, () => member.CreateInvitationAsync());
+        var ordinary = new MainWindow(member, await member.MeAsync(), false);
+        Capture(ordinary, "ordinary-user", 1060, 660);
+        Check(((UIElement)ordinary.FindName("AdminButton")).Visibility == Visibility.Collapsed, "Ordinary user cannot see admin entry");
+        ordinary.Close();
+        await management.RefreshCommand.ExecuteAsync(null);
+        Check(management.Invitations.Single().Status == "used", "Used invitation state refreshed");
+        await management.CreateInviteCommand.ExecuteAsync(null);
+        string revoked = secret;
+        management.SelectedInvitation = management.Invitations.Single(i => i.Status == "available");
+        await management.RevokeInviteAsync();
+        Check(management.Invitations.Any(i => i.Status == "revoked"), "Revoke invitation updates state");
+        await ExpectApi(400, () => member.RegisterAsync(revoked, "revoked-invite", "member123"));
+
+        string platformId = await other.SavePlatformAsync(null, "同事的云平台", "https://example.com");
+        string accountId = await other.SaveAccountAsync(null, platformId, "开发环境", "colleague@example.com", "管理员仅可查看", "other-secret");
+        await management.RefreshCommand.ExecuteAsync(null);
+        var target = management.Users.Single(u => u.Username == "other-test");
+        var vm = window.ViewModel;
+        await vm.SwitchUserAsync(target);
+        Check(vm.IsReadOnly && !vm.CanEdit && vm.Accounts.Single().Id == accountId && vm.LibraryTitle.Contains(target.Username), "Switch to correct read-only owner");
+        vm.SelectedAccount = vm.Accounts.Single();
+        await vm.RevealPasswordCommand.ExecuteAsync(null);
+        Check(vm.PasswordDisplay == "other-secret", "Admin view password route");
+        string? copied = null; await vm.CopyPasswordAsync(value => copied = value);
+        Check(copied == "other-secret", "Admin copy password route");
+        vm.HidePassword();
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+        Capture(window, "admin-readonly", 1320, 820);
+        Capture(window, "admin-readonly-small", 1060, 660);
+        Check(((UIElement)window.FindName("EditAccountButton")).Visibility == Visibility.Collapsed
+            && ((UIElement)window.FindName("DeleteAccountButton")).Visibility == Visibility.Collapsed, "Read-only UI hides account mutation controls");
+        await vm.SwitchUserAsync(null);
+        Check(!vm.IsReadOnly && vm.CanEdit && vm.Accounts.Count == 4 && vm.SelectedAccount is null && !vm.PasswordVisible, "Return to own data clears foreign selection and secret");
+        var ordinaryVm = new MainViewModel(other, await other.MeAsync());
+        Check(!await ordinaryVm.SwitchUserAsync(target) && !ordinaryVm.IsReadOnly, "View model rejects non-admin inspection");
+
+        management.SelectedUser = management.Users.Single(u => u.Username == "invited-test");
+        await management.ToggleUserAsync();
+        Check(management.SelectedUser?.Active == 0, "Disable updates selected user");
+        await ExpectApi(401, () => member.MeAsync());
+        await management.ToggleUserAsync();
+        Check(management.SelectedUser?.Active == 1, "Enable updates selected user");
+        await member.LoginAsync("invited-test", "member123");
+        await management.ResetPasswordAsync();
+        Check(secret.Length == 20 && management.SelectedUser?.MustChangePassword == 1, "Reset exposes temporary password once and updates status");
+        await ExpectApi(401, () => member.MeAsync());
+        var temporaryLogin = await member.LoginAsync("invited-test", secret);
+        Check(temporaryLogin.MustChangePassword, "Temporary login requires change");
+        await ExpectApi(403, () => member.AccountsAsync("", null));
+        await member.ChangePasswordAsync(secret, "changed123");
+        await member.LoginAsync("invited-test", "changed123");
+        Check((await member.MeAsync()).Username == "invited-test", "Invitation through reset/change full flow");
+        var adminWindow = new AdminWindow(api, false);
+        await adminWindow.ViewModel.RefreshCommand.ExecuteAsync(null);
+        adminWindow.ViewModel.SelectedUser = adminWindow.ViewModel.Users.Single(u => u.Username == "other-test");
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+        await Task.Delay(250);
+        Capture(adminWindow, "admin-users", 960, 680);
+        ((System.Windows.Controls.TabControl)adminWindow.FindName("Tabs")).SelectedIndex = 1;
+        Capture(adminWindow, "admin-invitations", 960, 680);
+        adminWindow.Close();
+        var register = new RegisterWindow(api); Capture(register, "register", 540, 660); register.Close();
+        var once = new SecretWindow("邀请码已创建", "example-only-not-a-real-invitation", "示例：仅在此处展示一次，请复制后手动发给同事。");
+        Capture(once, "one-time-secret", 580, 290); once.Close();
+        // Confirm view/copy are declared separately for server auditing.
+        using var handler = new AdminPasswordHandler(); using var auditApi = new ApiClient(handler);
+        var auditVm = new MainViewModel(auditApi, me) { ViewedUser = target, SelectedAccount = new AccountRecord(accountId, platformId, "", "test", "") };
+        await auditVm.RevealPasswordCommand.ExecuteAsync(null); await auditVm.CopyPasswordAsync(_ => { });
+        Check(handler.Actions.SequenceEqual(new[] { "view", "copy" }), "Admin reveal and copy use distinct audit actions");
+    }
+
+    private sealed class AdminPasswordHandler : HttpMessageHandler
+    {
+        public List<string> Actions { get; } = [];
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+            Actions.Add(body.RootElement.GetProperty("action").GetString()!);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"user\":{\"id\":\"test\",\"username\":\"test\",\"role\":\"user\"},\"data\":{\"password\":\"fake\"}}", Encoding.UTF8, "application/json") };
+        }
     }
 
     private static void Capture(Window window, string name, int width, int height)

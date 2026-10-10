@@ -11,6 +11,10 @@ $sources = @(Get-ChildItem ../backend/src/accmgr/*.java | ForEach-Object { $_.Fu
 if ($LASTEXITCODE -ne 0) { throw 'Fixture compilation failed' }
 & $Dotnet build tests/DesktopChecks.csproj -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Desktop test compilation failed' }
+foreach ($scenario in @('login', 'main', 'owned', 'pending', 'logout', 'login-transition')) {
+    & $Dotnet tests/bin/Release/net10.0-windows/DesktopChecks.dll --lifecycle $scenario
+    if ($LASTEXITCODE -ne 0) { throw "Application lifecycle check failed: $scenario" }
+}
 $fixture = Start-Process -FilePath "$Jdk/bin/java.exe" -ArgumentList '-Xms16m','-Xmx128m','-cp','../desktop/artifacts/fixture;build/lib/*;build/test-lib/*','accmgr.Fixture',"$Port" -WorkingDirectory (Resolve-Path ../backend) -WindowStyle Hidden -PassThru -RedirectStandardOutput "$PSScriptRoot/artifacts/fixture.stdout.log" -RedirectStandardError "$PSScriptRoot/artifacts/fixture.stderr.log"
 try {
     $ready = $false

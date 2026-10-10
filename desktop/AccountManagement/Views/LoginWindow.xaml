@@ -28,7 +28,8 @@
      <ui:TextBox x:Name="UsernameBox" MaxLength="100" AutomationProperties.Name="用户名"/>
      <TextBlock Text="登录密码" Style="{StaticResource FieldLabel}"/>
      <PasswordBox x:Name="PasswordInput" MaxLength="256" Padding="10" AutomationProperties.Name="登录密码"/>
-     <ui:Button x:Name="LoginButton" Content="登 录" Appearance="Primary" HorizontalAlignment="Stretch" Margin="0,22,0,0" IsDefault="True" Click="Login_Click"/>
+     <ui:Button x:Name="LoginButton" Content="登 录" Appearance="Primary" Background="#0067C0" Foreground="White" HorizontalAlignment="Stretch" Margin="0,22,0,0" IsDefault="True" Click="Login_Click"/>
+     <ui:Button Content="使用邀请码注册" HorizontalAlignment="Stretch" Margin="0,8,0,0" Click="Register_Click"/>
     </StackPanel>
     <TextBlock x:Name="Notice" TextWrapping="Wrap" Foreground="#9F3A38" FontSize="12" Margin="0,12,0,0"/>
     <TextBlock Text="管理员可查看你保存的平台帐号和密码。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,14,0,0"/>
