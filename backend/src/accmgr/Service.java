@@ -1,0 +1,293 @@
+package accmgr;
+
+import com.google.gson.*;
+import java.net.URI;
+import java.sql.*;
+import java.util.*;
+import static accmgr.Database.*;
+
+final class Service {
+    static final long SESSION_MILLIS = 7L * 24 * 60 * 60 * 1000;
+    static final String ADMIN_ID = "00000000-0000-0000-0000-000000000001";
+    private final Database db;
+    private final Crypto crypto;
+    private final String dummyHash;
+    private long loginWindow;
+    private int loginCount;
+
+    static final class Problem extends RuntimeException {
+        final int status;
+        Problem(int status, String code) { super(code); this.status = status; }
+    }
+
+    Service(Database db, Crypto crypto) throws Exception {
+        this.db = db;
+        this.crypto = crypto;
+        dummyHash = Crypto.hashPassword(Crypto.token());
+    }
+
+    void bootstrap(String username, String password) throws Exception {
+        username = checked(username.trim(), 1, 100);
+        checked(password, 6, 256);
+        try (Connection c = db.connections.open()) {
+            if (one(c, "SELECT id FROM am_users WHERE role = 'admin'") != null)
+                throw new Problem(409, "admin_already_initialized");
+            update(c, "INSERT INTO am_users (id,username,password_hash,role,created_at) VALUES (?,?,?,?,?)",
+                    ADMIN_ID, username, Crypto.hashPassword(password), "admin", System.currentTimeMillis());
+        }
+    }
+
+    Object execute(String method, String path, String token, JsonObject body, Map<String, String> query) throws Exception {
+        if (path.equals("/api/login") && method.equals("POST")) {
+            limitLogin();
+            return login(body);
+        }
+        try (Connection c = db.connections.open()) {
+            c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            c.setAutoCommit(false);
+            try {
+                Map<String, Object> user = authenticate(c, token);
+                String owner = (String) user.get("id");
+                if (number(user, "must_change_password") != 0
+                        && !path.equals("/api/password") && !path.equals("/api/logout"))
+                    throw new Problem(403, "password_change_required");
+                Object result;
+                if (path.equals("/api/me") && method.equals("GET")) {
+                    result = object("id", owner, "username", user.get("username"), "role", user.get("role"));
+                } else if (path.equals("/api/logout") && method.equals("POST")) {
+                    update(c, "DELETE FROM am_sessions WHERE token_hash=?", Crypto.digest(token));
+                    result = object("ok", true);
+                } else if (path.equals("/api/password") && method.equals("POST")) {
+                    String oldPassword = text(body, "old_password", 1, 256);
+                    String password = text(body, "new_password", 6, 256);
+                    if (!Crypto.verifyPassword(oldPassword, (String) user.get("password_hash")))
+                        throw new Problem(400, "incorrect_password");
+                    update(c, "UPDATE am_users SET password_hash=?,must_change_password=0 WHERE id=?",
+                            Crypto.hashPassword(password), owner);
+                    update(c, "DELETE FROM am_sessions WHERE user_id=?", owner);
+                    result = object("ok", true, "login_required", true);
+                } else if (path.equals("/api/platforms")) {
+                    result = platforms(c, owner, method, body);
+                } else if (path.startsWith("/api/platforms/")) {
+                    result = platform(c, owner, id(path.substring(15)), method, body);
+                } else if (path.equals("/api/accounts")) {
+                    result = accounts(c, owner, method, body, query);
+                } else if (path.startsWith("/api/accounts/")) {
+                    String suffix = path.substring(14);
+                    boolean reveal = suffix.endsWith("/password");
+                    String accountId = id(reveal ? suffix.substring(0, suffix.length() - 9) : suffix);
+                    result = account(c, owner, accountId, method, body, reveal);
+                } else {
+                    throw new Problem(404, "not_found");
+                }
+                c.commit();
+                return result;
+            } catch (Exception e) {
+                c.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1062 || "23505".equals(e.getSQLState()))
+                throw new Problem(409, "duplicate_record");
+            if (e.getErrorCode() == 1451 || "23503".equals(e.getSQLState()))
+                throw new Problem(409, "record_in_use");
+            throw e;
+        }
+    }
+
+    private synchronized void limitLogin() {
+        long now = System.currentTimeMillis();
+        if (now - loginWindow >= 60000) { loginWindow = now; loginCount = 0; }
+        if (++loginCount > 60) throw new Problem(429, "too_many_login_attempts");
+    }
+
+    private Object login(JsonObject body) throws Exception {
+        String username = text(body, "username", 1, 100).trim();
+        String password = text(body, "password", 1, 256);
+        try (Connection c = db.connections.open()) {
+            c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            c.setAutoCommit(false);
+            try {
+                Map<String, Object> user = one(c, "SELECT * FROM am_users WHERE username=? FOR UPDATE", username);
+                long now = System.currentTimeMillis();
+                if (user == null || number(user, "active") == 0 || number(user, "locked_until") > now) {
+                    Crypto.verifyPassword(password, dummyHash);
+                    throw new Problem(401, "invalid_credentials");
+                }
+                if (!Crypto.verifyPassword(password, (String) user.get("password_hash"))) {
+                    long failures = number(user, "locked_until") > 0 ? 1 : number(user, "failed_logins") + 1;
+                    update(c, "UPDATE am_users SET failed_logins=?,locked_until=? WHERE id=?",
+                            failures, failures >= 5 ? now + 15 * 60 * 1000 : 0, user.get("id"));
+                    c.commit(); // Failed attempts must survive the rejected login.
+                    throw new Problem(401, "invalid_credentials");
+                }
+                update(c, "UPDATE am_users SET failed_logins=0,locked_until=0 WHERE id=?", user.get("id"));
+                update(c, "DELETE FROM am_sessions WHERE expires_at<=?", now);
+                String token = Crypto.token();
+                long expires = now + SESSION_MILLIS;
+                update(c, "INSERT INTO am_sessions (token_hash,user_id,expires_at) VALUES (?,?,?)",
+                        Crypto.digest(token), user.get("id"), expires);
+                c.commit();
+                return object("token", token, "expires_at", expires,
+                        "must_change_password", number(user, "must_change_password") != 0);
+            } catch (Exception e) {
+                c.rollback();
+                throw e;
+            }
+        }
+    }
+
+    private Map<String, Object> authenticate(Connection c, String token) throws Exception {
+        if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw new Problem(401, "login_required");
+        Map<String, Object> session = one(c, "SELECT user_id FROM am_sessions WHERE token_hash=? AND expires_at>?",
+                Crypto.digest(token), System.currentTimeMillis());
+        if (session == null) throw new Problem(401, "login_required");
+        // Serialize writes per owner, including password changes and session invalidation.
+        Map<String, Object> user = one(c, "SELECT * FROM am_users WHERE id=? FOR UPDATE", session.get("user_id"));
+        if (user == null || number(user, "active") == 0) throw new Problem(401, "login_required");
+        // Locking read observes logout/password-change commits after waiting for the user lock.
+        if (one(c, "SELECT token_hash FROM am_sessions WHERE token_hash=? AND expires_at>? FOR UPDATE",
+                Crypto.digest(token), System.currentTimeMillis()) == null) throw new Problem(401, "login_required");
+        return user;
+    }
+
+    private Object platforms(Connection c, String owner, String method, JsonObject body) throws Exception {
+        if (method.equals("GET")) return rows(c,
+                "SELECT p.id,p.name,p.url,p.created_at,p.updated_at,"
+                + "(SELECT COUNT(*) FROM am_accounts a WHERE a.platform_id=p.id) AS account_count "
+                + "FROM am_platforms p WHERE p.owner_id=? ORDER BY p.name,p.id", owner);
+        if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
+        String platformId = UUID.randomUUID().toString();
+        long now = System.currentTimeMillis();
+        update(c, "INSERT INTO am_platforms (id,owner_id,name,url,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+                platformId, owner, platformName(body), url(body), now, now);
+        return object("id", platformId);
+    }
+
+    private Object platform(Connection c, String owner, String platformId, String method, JsonObject body) throws Exception {
+        Map<String, Object> record = ownedPlatform(c, owner, platformId);
+        if (method.equals("GET")) return record;
+        if (method.equals("PUT")) {
+            update(c, "UPDATE am_platforms SET name=?,url=?,updated_at=? WHERE id=? AND owner_id=?",
+                    platformName(body), url(body), System.currentTimeMillis(), platformId, owner);
+        } else if (method.equals("DELETE")) {
+            if (one(c, "SELECT id FROM am_accounts WHERE platform_id=? AND owner_id=?", platformId, owner) != null)
+                throw new Problem(409, "platform_not_empty");
+            update(c, "DELETE FROM am_platforms WHERE id=? AND owner_id=?", platformId, owner);
+        } else throw new Problem(405, "method_not_allowed");
+        return object("ok", true);
+    }
+
+    private Map<String, Object> ownedPlatform(Connection c, String owner, String platformId) throws Exception {
+        Map<String, Object> record = one(c, "SELECT id,name,url,created_at,updated_at FROM am_platforms WHERE id=? AND owner_id=?",
+                platformId, owner);
+        if (record == null) throw new Problem(404, "not_found");
+        return record;
+    }
+
+    private Object accounts(Connection c, String owner, String method, JsonObject body, Map<String, String> query) throws Exception {
+        if (method.equals("GET")) {
+            String search = checked(query.getOrDefault("q", ""), 0, 200).toLowerCase(Locale.ROOT);
+            List<Map<String, Object>> results = rows(c,
+                    "SELECT a.id,a.platform_id,a.name,a.login,a.notes,a.created_at,a.updated_at,p.name AS platform_name "
+                    + "FROM am_accounts a JOIN am_platforms p ON p.id=a.platform_id AND p.owner_id=a.owner_id "
+                    + "WHERE a.owner_id=? ORDER BY a.updated_at DESC,a.id", owner);
+            String filter = query.get("platform_id");
+            if (filter != null) id(filter);
+            Iterator<Map<String, Object>> iterator = results.iterator();
+            while (iterator.hasNext()) {
+                Map<String, Object> row = iterator.next();
+                if (!search.isEmpty()) {
+                    boolean match = false;
+                    for (String field : new String[]{"platform_name", "name", "login", "notes"})
+                        match |= ((String) row.get(field)).toLowerCase(Locale.ROOT).contains(search);
+                    if (!match) iterator.remove();
+                } else if (filter != null && !filter.equals(row.get("platform_id"))) iterator.remove();
+            }
+            return results;
+        }
+        if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
+        String accountId = UUID.randomUUID().toString();
+        saveAccount(c, owner, accountId, body, true, null);
+        return object("id", accountId);
+    }
+
+    private Object account(Connection c, String owner, String accountId, String method, JsonObject body, boolean reveal) throws Exception {
+        Map<String, Object> record = one(c,
+                "SELECT id,platform_id,name,login,notes,password_cipher,created_at,updated_at "
+                + "FROM am_accounts WHERE id=? AND owner_id=?", accountId, owner);
+        if (record == null) throw new Problem(404, "not_found");
+        String ciphertext = (String) record.remove("password_cipher");
+        if (reveal) {
+            if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
+            return object("password", crypto.decrypt(ciphertext, owner + ":" + accountId));
+        }
+        if (method.equals("GET")) return record;
+        if (method.equals("PUT")) saveAccount(c, owner, accountId, body, false, ciphertext);
+        else if (method.equals("DELETE")) update(c, "DELETE FROM am_accounts WHERE id=? AND owner_id=?", accountId, owner);
+        else throw new Problem(405, "method_not_allowed");
+        return object("ok", true);
+    }
+
+    private void saveAccount(Connection c, String owner, String accountId, JsonObject body, boolean create, String previous) throws Exception {
+        String platformId = id(text(body, "platform_id", 36, 36));
+        ownedPlatform(c, owner, platformId);
+        String name = optional(body, "name", 120);
+        String login = checked(text(body, "login", 1, 160).trim(), 1, 160);
+        String notes = optional(body, "notes", 2000);
+        String ciphertext = previous;
+        if (create || body.has("password"))
+            ciphertext = crypto.encrypt(optional(body, "password", 1024), owner + ":" + accountId);
+        long now = System.currentTimeMillis();
+        if (create) update(c,
+                "INSERT INTO am_accounts (id,owner_id,platform_id,name,login,password_cipher,notes,created_at,updated_at) "
+                + "VALUES (?,?,?,?,?,?,?,?,?)", accountId, owner, platformId, name, login, ciphertext, notes, now, now);
+        else update(c, "UPDATE am_accounts SET platform_id=?,name=?,login=?,password_cipher=?,notes=?,updated_at=? WHERE id=? AND owner_id=?",
+                platformId, name, login, ciphertext, notes, now, accountId, owner);
+    }
+
+    private static String platformName(JsonObject body) { return checked(text(body, "name", 1, 120).trim(), 1, 120); }
+
+    private static String url(JsonObject body) {
+        String value = optional(body, "url", 1000).trim();
+        if (!value.isEmpty()) {
+            try {
+                URI uri = new URI(value);
+                if (!("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))
+                        || uri.getHost() == null || uri.getUserInfo() != null) throw new Exception();
+            } catch (Exception e) { throw new Problem(400, "invalid_url"); }
+        }
+        return value;
+    }
+
+    private static String id(String value) {
+        if (!value.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))
+            throw new Problem(404, "not_found");
+        return value;
+    }
+
+    static String text(JsonObject body, String name, int min, int max) {
+        JsonElement value = body.get(name);
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())
+            throw new Problem(400, "invalid_field_" + name);
+        return checked(value.getAsString(), min, max);
+    }
+
+    private static String optional(JsonObject body, String name, int max) {
+        return body.has(name) ? text(body, name, 0, max) : "";
+    }
+
+    private static String checked(String value, int min, int max) {
+        int length = value.codePointCount(0, value.length());
+        if (length < min || length > max || value.indexOf('\0') >= 0) throw new Problem(400, "invalid_length");
+        return value;
+    }
+
+    private static long number(Map<String, Object> row, String field) { return ((Number) row.get(field)).longValue(); }
+
+    static Map<String, Object> object(Object... pairs) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) result.put((String) pairs[i], pairs[i + 1]);
+        return result;
+    }
+}
