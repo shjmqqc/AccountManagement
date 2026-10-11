@@ -8,11 +8,13 @@
 
 另已实现：邀请注册、管理员停用/恢复/重置、他人数据只读查看、密码查看/复制审计及审计查询。Windows 核心及管理界面已接入；小程序、Nginx HTTPS 部署和备份自动化尚未完成。本人接口仍不能越权读写他人数据。
 
-**已经部署过的服务器请按 [UPGRADE.md](UPGRADE.md) 升级，只执行 003 增量建表，不重跑以下首次部署流程。**
+另已实现单帐号多接收人只读分享、手动撤销、自定义彩色标签及筛选，Windows 已接入。接收人通过专用接口读取已授权的帐号和密码。
+
+**已安装管理功能的服务器请按 [SHARING-UPGRADE.md](SHARING-UPGRADE.md) 升级，只执行 004 增量建表并更新 JAR，不重跑以下首次部署流程。** 尚未安装 003 时先参考 [UPGRADE.md](UPGRADE.md)。
 
 HTTP 监听地址由 `config.properties` 的 `http.host` 指定，示例配置为 `0.0.0.0`，端口由 `http.port` 指定（默认 18082）。旧配置未填写 http.host 时仍监听 127.0.0.1。后端不强制 HTTPS，后续由 Nginx 终止 TLS 并反向代理到此 HTTP 服务。
 
-## 本次监听地址更新（已部署服务器）
+## 监听地址配置
 
 只替换 account-management.jar，并在现有 config.properties 中加入或修改以下两项（不要覆盖数据库密码或密钥路径）：
 
@@ -60,6 +62,7 @@ backend/
   config.example.properties
   002-core-schema.sql
   003-admin-schema.sql
+  004-sharing-tags.sql
 ```
 
 1. 管理员运行建表脚本：
@@ -67,9 +70,10 @@ backend/
 ```bash
 mysql -u root -p < 002-core-schema.sql
 mysql -u root -p < 003-admin-schema.sql
+mysql -u root -p < 004-sharing-tags.sql
 ```
 
-仅在已确认的新库 account_management 执行，不添加 `--force`。002 建四张核心表，003 建两张管理表，不删表、不修改旧业务库。每条命令成功后才执行下一条；MySQL 5.5 DDL 非事务性，任何失败都应先检查报错，不能直接反复执行或删表。
+仅在已确认的新库 account_management 执行，不添加 `--force`。002 建四张核心表，003 建两张管理表，004 建三张分享/标签表，不删表、不修改旧业务库。每条命令成功后才执行下一条；MySQL 5.5 DDL 非事务性，任何失败都应先检查报错，不能直接反复执行或删表。
 
 2. 创建独立应用用户；下列密码占位必须自行替换为独立随机字母数字密码。不要使用 root、旧服务或 am_probe 帐号运行后端。
 

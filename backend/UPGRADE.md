@@ -1,6 +1,8 @@
 # 已部署核心后端：邀请和管理接口升级
 
-适用于已经有 002 四张表、管理员和 vault.key 的 `/opt/acc_mgr/backend`。本次只新增 `am_invitations`、`am_audit_logs` 两张表并替换新工具的 JAR，不修改旧 Spring Boot 服务。Windows 管理界面尚未接入这些接口。
+适用于已经有 002 四张表、管理员和 vault.key 的 `/opt/acc_mgr/backend`。本页说明 003 管理功能迁移：新增 `am_invitations`、`am_audit_logs` 两张表，不修改旧 Spring Boot 服务。Windows 管理界面已接入。
+
+**当前版本还需要 004 分享/标签表。** 已执行过 003 的服务器直接按 [SHARING-UPGRADE.md](SHARING-UPGRADE.md) 升级；从 002 升级时，在完成本页 003 后、启动当前版本 JAR 前，继续执行 004。不要重跑已完成的建表脚本。
 
 ## 1. 备份并上传
 

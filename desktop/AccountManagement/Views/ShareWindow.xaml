@@ -1,0 +1,19 @@
+<ui:FluentWindow x:Class="AccountManagement.Views.ShareWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+ Title="分享帐号" Width="650" Height="650" MinWidth="550" MinHeight="520"
+ WindowStartupLocation="CenterOwner" ExtendsContentIntoTitleBar="True" FontFamily="Microsoft YaHei UI">
+ <Grid Background="#F7F9FC"><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ui:TitleBar Title="分享帐号"/>
+  <Grid x:Name="Fields" Grid.Row="1" Margin="26,18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <StackPanel><TextBlock x:Name="Heading" FontSize="23" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock Text="接收人可查看和复制密码，不能修改或再次分享。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,15"/></StackPanel>
+   <DockPanel Grid.Row="1"><ui:Button DockPanel.Dock="Right" Content="查找" Click="Search_Click" Margin="10,0,0,0"/><ui:TextBox x:Name="UsernameBox" MaxLength="100" PlaceholderText="输入接收人的完整用户名"/></DockPanel>
+   <DockPanel Grid.Row="2" Margin="0,12,0,0"><ui:Button DockPanel.Dock="Right" Content="添加授权" Click="Grant_Click" Background="#0067C0" Foreground="White" Margin="10,0,0,0"/><ComboBox x:Name="RecipientPicker" DisplayMemberPath="Username" HorizontalContentAlignment="Stretch"/></DockPanel>
+   <TextBlock Grid.Row="3" Text="已授权用户" Style="{StaticResource FieldLabel}" Margin="0,24,0,10"/>
+   <ListBox Grid.Row="4" x:Name="GrantList" DisplayMemberPath="Display" HorizontalContentAlignment="Stretch"/>
+   <DockPanel Grid.Row="5" Margin="0,14,0,0"><ui:Button DockPanel.Dock="Right" Content="撤销所选授权" Click="Revoke_Click"/><TextBlock Text="授权长期有效；已复制的内容无法收回。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/></DockPanel>
+  </Grid>
+  <DockPanel Grid.Row="2" Margin="26,0,26,18"><ui:Button DockPanel.Dock="Right" x:Name="RefreshButton" Content="刷新" Click="Refresh_Click"/><TextBlock x:Name="Notice" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/></DockPanel>
+ </Grid>
+</ui:FluentWindow>

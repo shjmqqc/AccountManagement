@@ -116,6 +116,7 @@ internal static class Program
         var platformEditor = new EditorWindow(api, EditorKind.Platform, platform: platform); Capture(platformEditor, "edit-platform", 530, 460); platformEditor.Close();
         var passwordEditor = new EditorWindow(api, EditorKind.ChangePassword); Capture(passwordEditor, "change-password", 530, 540); passwordEditor.Close();
         await AdminFlow(api, me, other, endpoint, window);
+        await SharingFlow(api, other, window, accountId, platformId);
         window.Close();
 
         // A late password response must not populate another selection.
@@ -224,6 +225,65 @@ internal static class Program
         var auditVm = new MainViewModel(auditApi, me) { ViewedUser = target, SelectedAccount = new AccountRecord(accountId, platformId, "", "test", "") };
         await auditVm.RevealPasswordCommand.ExecuteAsync(null); await auditVm.CopyPasswordAsync(_ => { });
         Check(handler.Actions.SequenceEqual(new[] { "view", "copy" }), "Admin reveal and copy use distinct audit actions");
+    }
+
+    private static async Task SharingFlow(ApiClient owner, ApiClient receiver, MainWindow ownWindow, string accountId, string platformId)
+    {
+        var production = await owner.CreateTagAsync("正式平台", "red");
+        var testing = await owner.CreateTagAsync("测试帐号", "blue");
+        Check((await owner.CreateTagAsync("正式平台", "green")).Id == production.Id, "Tags reused within same owner");
+        var otherTag = await receiver.CreateTagAsync("正式平台", "orange");
+        Check(otherTag.Id != production.Id, "Same-name tag ownership isolation");
+        var account = (await owner.AccountsAsync("", null)).Single(a => a.Id == accountId);
+        await owner.SaveAccountAsync(account, platformId, account.Name, account.Login, account.Notes, null, [production.Id, testing.Id]);
+        account = (await owner.AccountsAsync("", null)).Single(a => a.Id == accountId);
+        Check(account.Tags.Count == 2, "Multiple tag assignment serialized");
+        await ownWindow.ViewModel.RunAsync(() => ownWindow.ViewModel.ReloadAsync(accountId));
+        Check(ownWindow.ViewModel.TagChoices.Count == 3, "Filter offers assigned tags");
+        ownWindow.ViewModel.SelectedTag = production;
+        Check(ownWindow.ViewModel.Accounts.Count == 1 && ownWindow.ViewModel.IsIdle, "Changing tag filters locally without starting requests");
+        await ownWindow.ViewModel.RunAsync(async () => {
+            ownWindow.ViewModel.SelectedTag = production; await ownWindow.ViewModel.LoadAccountsAsync(accountId);
+        });
+        Check(ownWindow.ViewModel.Accounts.Count == 1, "Tag filtering in view model");
+        Capture(ownWindow, "tags-main", 1320, 820);
+        var editor = new EditorWindow(owner, EditorKind.Account, ownWindow.ViewModel.Platforms, account: account);
+        await editor.LoadTagsAsync();
+        Check(((System.Windows.Controls.ListBox)editor.FindName("TagPicker")).SelectedItems.Count == 2, "Editor preselects saved tags");
+        Capture(editor, "tags-editor", 530, 900); editor.Close();
+        var matches = await owner.FindRecipientsAsync("other-test");
+        Check(matches.Count == 1 && matches[0].Id == (await receiver.MeAsync()).Id, "Exact recipient lookup through client");
+        await owner.GrantAsync(accountId, matches[0].Id);
+        Check((await owner.SharesAsync(accountId)).Count == 1, "Grant and list recipients");
+        var shareWindow = new ShareWindow(owner, account, false); await shareWindow.LoadAsync();
+        Capture(shareWindow, "share-management", 650, 650); shareWindow.Close();
+        var sharedWindow = new MainWindow(receiver, await receiver.MeAsync(), false);
+        var vm = sharedWindow.ViewModel;
+        Check(await vm.SwitchSharedAsync(), "Open shared view");
+        Check(vm.IsReadOnly && !vm.CanEdit && vm.Accounts.Single().Id == accountId && vm.Accounts[0].Tags.Count == 2, "Received view exposes only authorized tagged account");
+        Check(vm.Accounts[0].OwnerUsername == "desktop-test" && vm.TagChoices.Count == 3, "Shared owner identity and filter choices");
+        vm.SelectedAccount = vm.Accounts[0];
+        await vm.RevealPasswordCommand.ExecuteAsync(null);
+        Check(vm.PasswordVisible && vm.PasswordDisplay == "测试密码🔐", "Shared password reveal");
+        vm.HidePassword();
+        string? copied = null; await vm.CopyPasswordAsync(value => copied = value);
+        Check(copied == "测试密码🔐", "Shared password copy");
+        Capture(sharedWindow, "shared-with-me", 1320, 820);
+        Capture(sharedWindow, "shared-with-me-small", 1060, 660);
+        await ExpectApi(404, () => receiver.SaveAccountAsync(account, platformId, account.Name, account.Login, account.Notes, "tamper"));
+        await ExpectApi(404, async () => await receiver.GrantAsync(accountId, (await owner.MeAsync()).Id));
+        await owner.RevokeShareAsync(accountId, matches[0].Id);
+        copied = null;
+        await vm.CopyPasswordAsync(value => copied = value);
+        Check(copied is null && !vm.PasswordVisible && vm.Accounts.Count == 0, "Revocation prevents copy and clears stale shared UI");
+        await vm.RefreshCommand.ExecuteAsync(null);
+        Check(vm.Accounts.Count == 0, "Revoked entry removed on refresh");
+        await vm.SwitchUserAsync(null);
+        Check(!vm.IsReadOnly && vm.Accounts.Count == 1 && vm.TagChoices.Count == 1, "Own view restored without foreign tags");
+        sharedWindow.Close();
+        await ownWindow.ViewModel.SwitchUserAsync(null);
+        ownWindow.ViewModel.ClearData();
+        Check(ownWindow.ViewModel.Accounts.Count == 0 && ownWindow.ViewModel.IsIdle, "Clearing tagged data does not reload accounts");
     }
 
     private sealed class AdminPasswordHandler : HttpMessageHandler

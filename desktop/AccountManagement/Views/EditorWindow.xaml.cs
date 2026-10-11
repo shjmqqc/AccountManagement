@@ -16,6 +16,8 @@ public partial class EditorWindow : FluentWindow
     private readonly PlatformRecord? platform;
     private readonly AccountRecord? account;
     private bool saving;
+    private bool tagsLoaded;
+    private readonly System.Collections.ObjectModel.ObservableCollection<TagRecord> tags = [];
     public bool Saved { get; private set; }
     public bool SessionExpired { get; private set; }
     public string? SavedId { get; private set; }
@@ -41,6 +43,8 @@ public partial class EditorWindow : FluentWindow
             ReplacePassword.Visibility = account is null ? Visibility.Collapsed : Visibility.Visible;
             AccountPassword.IsEnabled = account is null;
             if (account is not null) PasswordHint.Text = "未勾选时保留原密码，不会读取或回填原密码。";
+            TagPicker.ItemsSource = tags;
+            Loaded += async (_, _) => await LoadTagsAsync();
         }
         else { ChangePasswordPanel.Visibility = Visibility.Visible; Height = 540; }
         Closing += OnClosing;
@@ -55,6 +59,39 @@ public partial class EditorWindow : FluentWindow
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => Close();
+    public async Task LoadTagsAsync()
+    {
+        if (saving || tagsLoaded) return;
+        saving = true; Fields.IsEnabled = false; SaveButton.IsEnabled = false;
+        try
+        {
+            var records = await api.TagsAsync();
+            tags.Clear(); foreach (var tag in records) tags.Add(tag);
+            foreach (var tag in tags.Where(t => account?.Tags.Any(a => a.Id == t.Id) == true)) TagPicker.SelectedItems.Add(tag);
+            tagsLoaded = true;
+        }
+        catch (ApiException error) { ErrorText.Text = error.Message; SessionExpired = error.Status == 401 || error.Code == "password_change_required"; }
+        finally { saving = false; Fields.IsEnabled = true; SaveButton.IsEnabled = true; }
+        if (SessionExpired && IsVisible) Close();
+    }
+    private async void CreateTag_Click(object sender, RoutedEventArgs e)
+    {
+        if (saving) return;
+        if (string.IsNullOrWhiteSpace(TagNameBox.Text)) { ErrorText.Text = "请输入标签名称。"; return; }
+        if (!tagsLoaded) { await LoadTagsAsync(); if (!tagsLoaded) return; }
+        saving = true; Fields.IsEnabled = false; SaveButton.IsEnabled = false;
+        try
+        {
+            var tag = await api.CreateTagAsync(TagNameBox.Text.Trim(), (string)TagColorPicker.SelectedValue);
+            var existing = tags.FirstOrDefault(t => t.Id == tag.Id);
+            if (existing is null) { tags.Add(tag); existing = tag; }
+            if (!TagPicker.SelectedItems.Contains(existing)) TagPicker.SelectedItems.Add(existing);
+            TagNameBox.Clear(); ErrorText.Text = "标签已创建或复用；点击保存应用到帐号。取消表单仍保留标签库中的标签。";
+        }
+        catch (ApiException error) { ErrorText.Text = error.Message; SessionExpired = error.Status == 401 || error.Code == "password_change_required"; }
+        finally { saving = false; Fields.IsEnabled = true; SaveButton.IsEnabled = true; }
+        if (SessionExpired) Close();
+    }
     private void OnClosing(object? sender, CancelEventArgs e) { if (saving) e.Cancel = true; }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -64,6 +101,8 @@ public partial class EditorWindow : FluentWindow
         {
             if (kind == EditorKind.Platform && string.IsNullOrWhiteSpace(PlatformNameBox.Text)) throw new ArgumentException("请填写平台名称。");
             if (kind == EditorKind.Account && (PlatformPicker.SelectedItem is null || string.IsNullOrWhiteSpace(LoginBox.Text))) throw new ArgumentException("请选择平台并填写登录帐号。");
+            if (kind == EditorKind.Account && !tagsLoaded) { await LoadTagsAsync(); if (!tagsLoaded) return; }
+            if (kind == EditorKind.Account && TagPicker.SelectedItems.Count > 20) throw new ArgumentException("每条帐号最多选择 20 个标签。");
             if (kind == EditorKind.ChangePassword)
             {
                 if (OldPassword.Password.Length == 0) throw new ArgumentException("请填写原登录密码。");
@@ -74,7 +113,8 @@ public partial class EditorWindow : FluentWindow
             if (kind == EditorKind.Platform) SavedId = await api.SavePlatformAsync(platform, PlatformNameBox.Text.Trim(), UrlBox.Text.Trim());
             else if (kind == EditorKind.Account)
                 SavedId = await api.SaveAccountAsync(account, ((PlatformRecord)PlatformPicker.SelectedItem).Id, AccountNameBox.Text,
-                    LoginBox.Text.Trim(), NotesBox.Text, account is null || ReplacePassword.IsChecked == true ? AccountPassword.Password : null);
+                    LoginBox.Text.Trim(), NotesBox.Text, account is null || ReplacePassword.IsChecked == true ? AccountPassword.Password : null,
+                    TagPicker.SelectedItems.Cast<TagRecord>().Select(t => t.Id));
             else await api.ChangePasswordAsync(OldPassword.Password, NewPassword.Password);
             Saved = true; saving = false; DialogResult = true;
         }

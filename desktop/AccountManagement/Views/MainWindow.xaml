@@ -38,7 +38,12 @@
    <Border Background="#EAF0F8" CornerRadius="12" Padding="12,18,12,12">
     <Grid>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <DockPanel Margin="8,0"><ui:Button DockPanel.Dock="Right" Content="＋" ToolTip="新增平台" Click="AddPlatform_Click" Padding="9,3" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="平台" Style="{StaticResource PanelHeading}" VerticalAlignment="Center"/></DockPanel>
+     <StackPanel>
+      <WrapPanel Margin="0,0,0,12"><ui:Button Content="我的帐号" Click="ReturnOwn_Click" Padding="8,5"/><ui:Button Content="分享给我" Click="Shared_Click" Padding="8,5" Margin="6,0,0,0"/></WrapPanel>
+      <TextBlock Text="按标签筛选" Style="{StaticResource FieldLabel}"/>
+      <ComboBox ItemsSource="{Binding TagChoices}" SelectedItem="{Binding SelectedTag}" DisplayMemberPath="Name" Margin="0,0,0,16"/>
+      <DockPanel Margin="8,0"><ui:Button DockPanel.Dock="Right" Content="＋" ToolTip="新增平台" Click="AddPlatform_Click" Padding="9,3" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="平台" Style="{StaticResource PanelHeading}" VerticalAlignment="Center"/></DockPanel>
+     </StackPanel>
      <ListBox x:Name="PlatformList" Grid.Row="2" ItemsSource="{Binding Platforms}" SelectedItem="{Binding SelectedPlatform}" SelectionChanged="Platform_SelectionChanged" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="平台列表">
       <ListBox.ItemTemplate><DataTemplate><Grid Margin="5,9"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding AccountCount}" Style="{StaticResource ListSubtitle}" Margin="8,0,2,0"/></Grid></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
@@ -51,9 +56,9 @@
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition/></Grid.RowDefinitions>
      <DockPanel><ui:Button DockPanel.Dock="Right" Content="＋ 新增" Click="AddAccount_Click" Padding="10,5" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="{Binding ListTitle}" Style="{StaticResource PanelHeading}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/></DockPanel>
      <ListBox x:Name="AccountList" Grid.Row="2" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="帐号列表">
-      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="4,12"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Subtitle}" Style="{StaticResource ListSubtitle}" FontSize="11" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="4,12"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Subtitle}" ToolTip="{Binding Subtitle}" Style="{StaticResource ListSubtitle}" FontSize="11" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/><ItemsControl ItemsSource="{Binding Tags}" ItemTemplate="{StaticResource TagBadge}" ItemsPanel="{StaticResource TagWrap}"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
-     <TextBlock Grid.Row="2" Text="暂无帐号&#10;可新增帐号，或调整搜索条件" TextAlignment="Center" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Accounts.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+     <TextBlock Grid.Row="2" Text="暂无帐号&#10;请刷新或调整搜索条件" TextAlignment="Center" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Accounts.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
     </Grid>
    </Border>
    <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" Background="Transparent" ResizeBehavior="PreviousAndNext"/>
@@ -64,6 +69,9 @@
       <StackPanel>
        <DockPanel><ui:Button x:Name="EditAccountButton" DockPanel.Dock="Right" Content="编辑" Click="EditAccount_Click" Margin="12,0,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="{Binding SelectedAccount.DisplayName}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
        <TextBlock Text="{Binding DetailPlatform}" Foreground="#3269A5" Margin="0,8,0,14"/>
+       <TextBlock Text="{Binding SelectedAccount.OwnerUsername, StringFormat=分享人：{0}}" Visibility="{Binding ShowingShared, Converter={StaticResource BoolVisibility}}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+       <ItemsControl ItemsSource="{Binding SelectedAccount.Tags}" ItemTemplate="{StaticResource TagBadge}" ItemsPanel="{StaticResource TagWrap}"/>
+       <ui:Button Content="分享帐号" Click="Share_Click" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
        <TextBlock Text="平台网址" Style="{StaticResource FieldLabel}"/>
        <DockPanel><ui:Button DockPanel.Dock="Right" Content="打开" Click="OpenUrl_Click" Padding="10,4" Margin="8,0,0,0"/><TextBlock Text="{Binding DetailUrl}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DetailUrl}" VerticalAlignment="Center"/></DockPanel>
        <TextBlock Text="登录帐号" Style="{StaticResource FieldLabel}"/>

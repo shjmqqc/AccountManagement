@@ -39,6 +39,16 @@ public partial class MainWindow : FluentWindow
         if (dialog.ViewUser is { } user) await ViewModel.SwitchUserAsync(user.Id == ViewModel.User.Id ? null : user);
     }
     private async void ReturnOwn_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchUserAsync(null);
+    private async void Shared_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchSharedAsync();
+    private async void Share_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || ViewModel.IsReadOnly || ViewModel.SelectedAccount is not { } account) return;
+        ViewModel.HidePassword();
+        var dialog = new ShareWindow(api, account) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
+        else await ViewModel.RefreshCommand.ExecuteAsync(null);
+    }
     private async void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is null || ViewModel.IsBusy || ViewModel.SelectedPlatform is null) return;

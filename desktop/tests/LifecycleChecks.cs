@@ -30,8 +30,12 @@ internal static class LifecycleChecks
         }));
         bool requestedClose = false, transitioned = false;
         var probe = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-        var watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        watchdog.Tick += (_, _) => { Console.Error.WriteLine("FAIL window closed but application did not exit: " + scenario); app.Shutdown(91); };
+        // Allow WPF startup/transition separately; actual close must still exit within five seconds.
+        var watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        watchdog.Tick += (_, _) => {
+            Console.Error.WriteLine($"FAIL lifecycle {scenario}: close={requestedClose}, transition={transitioned}, window={app.MainWindow?.GetType().Name}, busy={(app.MainWindow as MainWindow)?.ViewModel.IsBusy}, status={(app.MainWindow as MainWindow)?.ViewModel.Status}");
+            app.Shutdown(91);
+        };
         probe.Tick += (_, _) =>
         {
             if (app.MainWindow is not { IsVisible: true } window) return;
@@ -62,6 +66,7 @@ internal static class LifecycleChecks
             }
             requestedClose = true;
             probe.Stop();
+            watchdog.Stop(); watchdog.Interval = TimeSpan.FromSeconds(5); watchdog.Start();
             window.Close();
         };
         probe.Start(); watchdog.Start();

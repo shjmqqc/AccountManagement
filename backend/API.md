@@ -1,4 +1,4 @@
-# 帐号管理 API（含邀请与管理员接口）
+# 帐号管理 API（含邀请、管理、分享与标签）
 
 JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外均需 `Authorization: Bearer <token>`。
 成功返回 HTTP 200，失败返回 `{"error":"错误码"}`。时间为 Unix 毫秒，记录 ID 为 UUID。
@@ -79,3 +79,36 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 成功操作和审计在同一事务中提交，审计失败则不提交管理变更、不返回密码；业务失败先回滚，再记录 failure。客户端超时不能据此判断服务端一定未提交：邀请可在列表核对，密码重置响应遗失后可再次重置获得新的临时密码。
 
 首次联调建议只使用虚构帐号和密码。通过接口创建平台和帐号后，退出并重新登录、重启该独立服务，再查看记录和读取密码，确认持久化与解密正常；不得重启旧业务来执行测试。
+
+## 单帐号分享
+
+先应用 `004-sharing-tags.sql`。以下接口均要求有效会话，强制改密限制同其他业务接口。
+
+| 方法 | 路径 | 请求 / 返回 |
+|---|---|---|
+| GET | /api/share-recipients?q=完整用户名 | 精确查找已启用且非本人的用户；返回 id、username 数组；空查询返回 400 |
+| GET | /api/accounts/{id}/shares | 仅所有者可列出接收人：id、username、active、created_at |
+| POST | /api/accounts/{id}/shares | `{ "recipient_id": "用户UUID" }`；添加只读授权，重复授权不重复创建 |
+| DELETE | /api/accounts/{id}/shares/{recipientId} | 仅所有者可撤销；重复撤销成功 |
+| GET | /api/shared/accounts | 分享给当前用户的帐号数组；支持 q、platform_id、tag_id |
+| GET | /api/shared/accounts/{id} | 已授权帐号详情及 tags，不含密码 |
+| POST | /api/shared/accounts/{id}/password | `{ "action": "view" }` 或 copy；返回 password |
+
+共享列表在普通帐号字段之外包含 owner_id、owner_username、platform_url，供客户端显示来源。授权只指向原帐号，所有者修改后重新读取即可获得新内容。接收人不能编辑、删除、再次分享，也不能访问同平台其他帐号。管理员也不能代替他人授予分享权限。
+
+无到期时间；撤销完成后后续读取返回 404，删除帐号自动清除授权。停用接收人使其会话失效；停用所有者期间其分享不可读取。授权记录保留，恢复启用后可继续使用（接收人需重新登录）。已显示或复制的内容不能收回。
+
+审计 action 新增 share_grant、share_revoke、shared_password_view、shared_password_copy。授予/撤销时 actor_id 为所有者、target_user_id 为接收人；密码访问时 actor_id 为接收人、target_user_id 为所有者；target_id 为帐号。成功操作与审计同事务，密码访问审计失败时不返回密码。通过路由及字段校验的业务失败记录 failure；未经所有权校验的分享管理请求不记录。并发事务冲突可能返回 409 concurrent_change_retry，刷新后重试。
+
+## 彩色标签
+
+| 方法 | 路径 | 请求 / 返回 |
+|---|---|---|
+| GET | /api/tags | 本人的可复用标签目录，数组元素为 id、name、color |
+| POST | /api/tags | `{ "name": "测试帐号", "color": "blue" }`；返回标签对象；同用户同名返回原标签及原颜色 |
+
+名称去除首尾空白后不能为空，输入最多 40 个 Unicode 字符；颜色限定 blue、green、orange、red、purple、gray。标签目录按用户隔离，不能给帐号绑定他人的标签。当前不提供目录标签重命名、改色或删除接口。
+
+新增/编辑帐号可传 `tag_ids: ["标签UUID", "标签UUID"]`，每帐号最多 20 个。传空数组移除该帐号的所有标签；不传则保留已有标签，兼容旧客户端。绑定与帐号保存同事务，无效标签导致整次保存回滚。取消帐号表单不删除已独立创建的目录标签。
+
+本人、管理员查看、收到的帐号列表和详情均包含 `tags: [{"id":"…","name":"测试帐号","color":"blue"}]`，无标签为空数组。列表 `tag_id` 为单标签筛选，与 q/platform_id 的结果取交集；有非空 q 仍忽略 platform_id。关键词搜索不包含标签文字。收到的标签只展示和筛选，接收人不能修改。

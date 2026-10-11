@@ -30,6 +30,14 @@
       <TextBlock x:Name="PasswordHint" Text="可留空，适用于验证码或扫码登录。" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
       <TextBlock Text="备注" Style="{StaticResource FieldLabel}"/>
       <ui:TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="95" VerticalScrollBarVisibility="Auto" MaxLength="2000"/>
+      <TextBlock Text="标签（最多 20 个）" Style="{StaticResource FieldLabel}"/>
+      <ListBox x:Name="TagPicker" SelectionMode="Multiple" MaxHeight="145" HorizontalContentAlignment="Stretch" ItemTemplate="{StaticResource TagBadge}"/>
+      <TextBlock Text="点击标签选中或取消。创建的标签可用于其他帐号。" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,8"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="88"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <ui:TextBox x:Name="TagNameBox" MaxLength="40" PlaceholderText="新标签名称"/>
+       <ComboBox x:Name="TagColorPicker" Grid.Column="1" SelectedIndex="0" SelectedValuePath="Tag" Margin="6,0"><ComboBoxItem Content="蓝色" Tag="blue"/><ComboBoxItem Content="绿色" Tag="green"/><ComboBoxItem Content="橙色" Tag="orange"/><ComboBoxItem Content="红色" Tag="red"/><ComboBoxItem Content="紫色" Tag="purple"/><ComboBoxItem Content="灰色" Tag="gray"/></ComboBox>
+       <ui:Button Grid.Column="2" Content="创建并选中" Click="CreateTag_Click" Padding="9,4"/>
+      </Grid>
      </StackPanel>
      <StackPanel x:Name="ChangePasswordPanel" Visibility="Collapsed">
       <TextBlock Text="修改成功后，所有设备都需要重新登录。" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
@@ -47,7 +55,7 @@
   <Border Grid.Row="2" Background="White" BorderBrush="#E5EAF0" BorderThickness="0,1,0,0" Padding="24,14">
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
     <ui:Button x:Name="CancelButton" Content="取消" Width="80" Margin="0,0,10,0" IsCancel="True" Click="Cancel_Click"/>
-    <ui:Button x:Name="SaveButton" Content="保存" Width="100" Appearance="Primary" Click="Save_Click"/>
+    <ui:Button x:Name="SaveButton" Content="保存" Width="100" Appearance="Primary" Background="#0067C0" Foreground="White" Click="Save_Click"/>
    </StackPanel>
   </Border>
  </Grid>

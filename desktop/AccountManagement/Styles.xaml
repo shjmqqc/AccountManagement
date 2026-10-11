@@ -7,6 +7,12 @@
  </ResourceDictionary.MergedDictionaries>
  <BooleanToVisibilityConverter x:Key="BoolVisibility"/>
  <SolidColorBrush x:Key="MutedBrush" Color="#637188"/>
+ <DataTemplate x:Key="TagBadge">
+  <Border Background="{Binding Background}" CornerRadius="5" Padding="7,3" Margin="0,4,5,0">
+   <TextBlock Text="{Binding Name}" Foreground="{Binding Foreground}" FontSize="11" MaxWidth="210" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+  </Border>
+ </DataTemplate>
+ <ItemsPanelTemplate x:Key="TagWrap"><WrapPanel/></ItemsPanelTemplate>
  <Style x:Key="FieldLabel" TargetType="TextBlock">
   <Setter Property="Margin" Value="0,14,0,6"/>
   <Setter Property="Foreground" Value="#526078"/>
