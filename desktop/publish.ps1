@@ -7,6 +7,7 @@ $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
 & $Dotnet publish AccountManagement/AccountManagement.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
 Copy-Item README.md artifacts/publish/使用说明.md
+Copy-Item ../LICENSE,../THIRD_PARTY_NOTICES.md artifacts/publish/
 $assets = Get-Content AccountManagement/obj/project.assets.json -Raw | ConvertFrom-Json
 $packageRoot = $assets.packageFolders.PSObject.Properties.Name | Select-Object -First 1
 New-Item -ItemType Directory -Force artifacts/publish/licenses | Out-Null

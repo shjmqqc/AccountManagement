@@ -38,6 +38,7 @@ New-Item -ItemType Directory -Force build/release/lib | Out-Null
 Copy-Item build/account-management.jar build/release/
 Copy-Item build/lib/gson-2.13.2.jar,build/lib/mysql-connector-java-5.1.49.jar build/release/lib/
 Copy-Item config.example.properties,README.md,API.md build/release/
+Copy-Item ../LICENSE,../THIRD_PARTY_NOTICES.md build/release/
 Copy-Item ../database/002-core-schema.sql build/release/
 Copy-Item ../database/003-admin-schema.sql,UPGRADE.md build/release/
 Get-ChildItem build/release -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
