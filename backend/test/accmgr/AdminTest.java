@@ -22,7 +22,7 @@ public final class AdminTest {
         db = new Database(() -> DriverManager.getConnection(
                 "jdbc:h2:mem:admin;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", ""));
         try (Connection c = db.connections.open(); Statement s = c.createStatement()) {
-            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql"}) {
+            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql", "004-sharing-tags.sql"}) {
                 String ddl = new String(Files.readAllBytes(Paths.get("../database/" + file)), StandardCharsets.UTF_8)
                         .replaceAll("(?m)^--.*$", "").replace("USE `account_management`;", "")
                         .replaceAll(" CHARACTER SET [a-zA-Z0-9_]+", "").replaceAll(" COLLATE[= ]+[a-zA-Z0-9_]+", "")

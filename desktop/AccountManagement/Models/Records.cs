@@ -6,10 +6,12 @@ public sealed record PlatformRecord(string Id, string Name, string Url, long Cre
 }
 
 public sealed record AccountRecord(string Id, string PlatformId, string Name, string Login, string Notes,
-    long CreatedAt = 0, long UpdatedAt = 0, string PlatformName = "")
+    long CreatedAt = 0, long UpdatedAt = 0, string PlatformName = "", string PlatformUrl = "",
+    string OwnerId = "", string OwnerUsername = "")
 {
+    public List<TagRecord> Tags { get; init; } = [];
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Login : Name;
-    public string Subtitle => $"{PlatformName} · {Login}";
+    public string Subtitle => $"{PlatformName} · {Login}" + (OwnerUsername.Length > 0 ? $" · 来自 {OwnerUsername}" : "");
     public string UpdatedText => UpdatedAt == 0 ? "—" : DateTimeOffset.FromUnixTimeMilliseconds(UpdatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 }
 
@@ -18,6 +20,20 @@ public sealed record LoginResult(string Token, long ExpiresAt, bool MustChangePa
 public sealed record SavedSession(string Endpoint, string Username, string Token, long ExpiresAt);
 public sealed record PasswordResult(string Password);
 public sealed record IdResult(string Id);
+public sealed record RecipientRecord(string Id, string Username, int Active = 1)
+{
+    public string Display => Username + (Active == 0 ? "（已停用）" : "");
+}
+public sealed record TagRecord(string Id, string Name, string Color)
+{
+    public string Background => Color switch {
+        "green" => "#DCF3E5", "orange" => "#FFF0D6", "red" => "#FCE0E0",
+        "purple" => "#EEE3FA", "gray" => "#E9EDF2", _ => "#DCEEFF" };
+    public string Foreground => Color switch {
+        "green" => "#14613A", "orange" => "#854B00", "red" => "#9A2929",
+        "purple" => "#683396", "gray" => "#455366", _ => "#125A96" };
+    public static TagRecord All { get; } = new("", "全部标签", "gray");
+}
 
 public sealed record ManagedUser(string Id, string Username, string Role, int Active, int MustChangePassword, long CreatedAt, int AccountCount)
 {

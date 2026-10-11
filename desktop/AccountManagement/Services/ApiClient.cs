@@ -50,6 +50,15 @@ public sealed class ApiClient : IDisposable
     }
 
     public Task<UserRecord> MeAsync() => SendAsync<UserRecord>(HttpMethod.Get, "api/me");
+    public Task<List<TagRecord>> TagsAsync() => SendAsync<List<TagRecord>>(HttpMethod.Get, "api/tags");
+    public Task<TagRecord> CreateTagAsync(string name, string color) => SendAsync<TagRecord>(HttpMethod.Post, "api/tags", new { name, color });
+    public Task<List<RecipientRecord>> FindRecipientsAsync(string username) => SendAsync<List<RecipientRecord>>(HttpMethod.Get, "api/share-recipients?q=" + Uri.EscapeDataString(username.Trim()));
+    public Task<List<RecipientRecord>> SharesAsync(string accountId) => SendAsync<List<RecipientRecord>>(HttpMethod.Get, $"api/accounts/{accountId}/shares");
+    public Task GrantAsync(string accountId, string recipientId) => SendAsync<JsonElement>(HttpMethod.Post, $"api/accounts/{accountId}/shares", new { recipientId });
+    public Task RevokeShareAsync(string accountId, string recipientId) => SendAsync<JsonElement>(HttpMethod.Delete, $"api/accounts/{accountId}/shares/{recipientId}");
+    public Task<List<AccountRecord>> SharedAccountsAsync() => SendAsync<List<AccountRecord>>(HttpMethod.Get, "api/shared/accounts");
+    public Task<AccountRecord> SharedAccountAsync(string id) => SendAsync<AccountRecord>(HttpMethod.Get, $"api/shared/accounts/{id}");
+    public async Task<string> SharedPasswordAsync(string id, string action) => (await SendAsync<PasswordResult>(HttpMethod.Post, $"api/shared/accounts/{id}/password", new { action })).Password;
     public Task RegisterAsync(string inviteCode, string username, string password) => SendAsync<IdResult>(HttpMethod.Post, "api/register", new { inviteCode, username, password });
     public Task<List<ManagedUser>> UsersAsync() => SendAsync<List<ManagedUser>>(HttpMethod.Get, "api/admin/users");
     public Task<List<InvitationRecord>> InvitationsAsync(string? before = null) => SendAsync<List<InvitationRecord>>(HttpMethod.Get,
@@ -85,10 +94,11 @@ public sealed class ApiClient : IDisposable
         return existing.Id;
     }
     public Task DeletePlatformAsync(string id) => SendAsync<JsonElement>(HttpMethod.Delete, "api/platforms/" + id);
-    public async Task<string> SaveAccountAsync(AccountRecord? existing, string platformId, string name, string login, string notes, string? password)
+    public async Task<string> SaveAccountAsync(AccountRecord? existing, string platformId, string name, string login, string notes, string? password, IEnumerable<string>? tagIds = null)
     {
         var body = new Dictionary<string, object> { ["platform_id"] = platformId, ["name"] = name, ["login"] = login, ["notes"] = notes };
         if (password is not null) body["password"] = password;
+        if (tagIds is not null) body["tag_ids"] = tagIds.ToArray();
         if (existing is null) return (await SendAsync<IdResult>(HttpMethod.Post, "api/accounts", body)).Id;
         await SendAsync<JsonElement>(HttpMethod.Put, "api/accounts/" + existing.Id, body);
         return existing.Id;
@@ -122,6 +132,11 @@ public sealed class ApiClient : IDisposable
     private static string FriendlyError(int status, string code) => code switch
     {
         "invalid_credentials" => "用户名或密码不正确；连续多次失败后，请等待 15 分钟再试。",
+        "recipient_username_required" => "请输入接收人的完整用户名。",
+        "invalid_recipient" => "接收人不可用，不能分享给自己或已停用的用户。",
+        "invalid_tag_ids" => "标签不可用或超过 20 个，请刷新后重新选择。",
+        "invalid_tag_color" => "请选择预设标签颜色。",
+        "concurrent_change_retry" => "同时有其他操作正在修改数据，请刷新后重试。",
         "login_required" => "登录已失效，请重新登录。",
         "password_change_required" => "请先修改临时登录密码。",
         "incorrect_password" => "原登录密码不正确。",

@@ -41,6 +41,7 @@ Copy-Item config.example.properties,README.md,API.md build/release/
 Copy-Item ../LICENSE,../THIRD_PARTY_NOTICES.md build/release/
 Copy-Item ../database/002-core-schema.sql build/release/
 Copy-Item ../database/003-admin-schema.sql,UPGRADE.md build/release/
+Copy-Item ../database/004-sharing-tags.sql build/release/
 Get-ChildItem build/release -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
     $relative = $_.FullName.Substring((Resolve-Path build/release).Path.Length + 1).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative

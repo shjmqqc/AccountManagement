@@ -64,6 +64,9 @@ public final class Main {
             Database.rows(c, "SELECT token_hash FROM am_sessions WHERE 1=0");
             Database.rows(c, "SELECT code_hash FROM am_invitations WHERE 1=0");
             Database.rows(c, "SELECT action FROM am_audit_logs WHERE 1=0");
+            Database.rows(c, "SELECT id FROM am_tags WHERE 1=0");
+            Database.rows(c, "SELECT tag_id FROM am_account_tags WHERE 1=0");
+            Database.rows(c, "SELECT recipient_id FROM am_account_shares WHERE 1=0");
             Map<String, Object> sample = Database.one(c, "SELECT id,owner_id,password_cipher FROM am_accounts LIMIT 1");
             if (sample != null) crypto.decrypt((String) sample.get("password_cipher"), sample.get("owner_id") + ":" + sample.get("id"));
         }

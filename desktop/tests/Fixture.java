@@ -11,7 +11,8 @@ public final class Fixture {
         Class.forName("org.h2.Driver");
         Database db = new Database(() -> DriverManager.getConnection("jdbc:h2:mem:desktop;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1", "sa", ""));
         String ddl = (new String(Files.readAllBytes(Paths.get("../database/002-core-schema.sql")), StandardCharsets.UTF_8)
-            + new String(Files.readAllBytes(Paths.get("../database/003-admin-schema.sql")), StandardCharsets.UTF_8))
+            + new String(Files.readAllBytes(Paths.get("../database/003-admin-schema.sql")), StandardCharsets.UTF_8)
+            + new String(Files.readAllBytes(Paths.get("../database/004-sharing-tags.sql")), StandardCharsets.UTF_8))
             .replaceAll("(?m)^--.*$", "").replace("USE `account_management`;", "")
             .replaceAll(" CHARACTER SET [a-zA-Z0-9_]+", "").replaceAll(" COLLATE[= ]+[a-zA-Z0-9_]+", "")
             .replaceAll(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "");

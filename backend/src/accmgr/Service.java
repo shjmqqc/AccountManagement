@@ -75,6 +75,13 @@ final class Service {
                             Crypto.hashPassword(password), owner);
                     update(c, "DELETE FROM am_sessions WHERE user_id=?", owner);
                     result = object("ok", true, "login_required", true);
+                } else if (path.equals("/api/share-recipients")) {
+                    result = new Sharing(this).recipients(c, owner, method, query);
+                } else if (path.equals("/api/tags")) {
+                    result = Sharing.tags(c, owner, method, body);
+                } else if (path.equals("/api/shared/accounts") || path.startsWith("/api/shared/accounts/")) {
+                    result = new Sharing(this).received(c, owner, method,
+                            path.equals("/api/shared/accounts") ? "" : path.substring(21), body, query);
                 } else if (path.equals("/api/platforms")) {
                     result = platforms(c, owner, method, body);
                 } else if (path.startsWith("/api/platforms/")) {
@@ -83,9 +90,14 @@ final class Service {
                     result = accounts(c, owner, method, body, query);
                 } else if (path.startsWith("/api/accounts/")) {
                     String suffix = path.substring(14);
+                    String[] parts = suffix.split("/", -1);
+                    if ((parts.length == 2 || parts.length == 3) && parts[1].equals("shares")) {
+                        result = new Sharing(this).grants(c, owner, id(parts[0]), parts.length == 3 ? id(parts[2]) : null, method, body);
+                    } else {
                     boolean reveal = suffix.endsWith("/password");
                     String accountId = id(reveal ? suffix.substring(0, suffix.length() - 9) : suffix);
                     result = account(c, owner, accountId, method, body, reveal);
+                    }
                 } else {
                     throw new Problem(404, "not_found");
                 }
@@ -100,6 +112,7 @@ final class Service {
                 throw new Problem(409, "duplicate_record");
             if (e.getErrorCode() == 1451 || "23503".equals(e.getSQLState()))
                 throw new Problem(409, "record_in_use");
+            if ("40001".equals(e.getSQLState())) throw new Problem(409, "concurrent_change_retry");
             throw e;
         }
     }
@@ -196,23 +209,12 @@ final class Service {
 
     Object accounts(Connection c, String owner, String method, JsonObject body, Map<String, String> query) throws Exception {
         if (method.equals("GET")) {
-            String search = checked(query.getOrDefault("q", ""), 0, 200).toLowerCase(Locale.ROOT);
             List<Map<String, Object>> results = rows(c,
                     "SELECT a.id,a.platform_id,a.name,a.login,a.notes,a.created_at,a.updated_at,p.name AS platform_name "
                     + "FROM am_accounts a JOIN am_platforms p ON p.id=a.platform_id AND p.owner_id=a.owner_id "
                     + "WHERE a.owner_id=? ORDER BY a.updated_at DESC,a.id", owner);
-            String filter = query.get("platform_id");
-            if (filter != null) id(filter);
-            Iterator<Map<String, Object>> iterator = results.iterator();
-            while (iterator.hasNext()) {
-                Map<String, Object> row = iterator.next();
-                if (!search.isEmpty()) {
-                    boolean match = false;
-                    for (String field : new String[]{"platform_name", "name", "login", "notes"})
-                        match |= ((String) row.get(field)).toLowerCase(Locale.ROOT).contains(search);
-                    if (!match) iterator.remove();
-                } else if (filter != null && !filter.equals(row.get("platform_id"))) iterator.remove();
-            }
+            Sharing.attachTags(c, results);
+            Sharing.filter(results, query);
             return results;
         }
         if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
@@ -231,7 +233,7 @@ final class Service {
             if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
             return object("password", crypto.decrypt(ciphertext, owner + ":" + accountId));
         }
-        if (method.equals("GET")) return record;
+        if (method.equals("GET")) { Sharing.attachTags(c, Collections.singletonList(record)); return record; }
         if (method.equals("PUT")) saveAccount(c, owner, accountId, body, false, ciphertext);
         else if (method.equals("DELETE")) update(c, "DELETE FROM am_accounts WHERE id=? AND owner_id=?", accountId, owner);
         else throw new Problem(405, "method_not_allowed");
@@ -253,6 +255,7 @@ final class Service {
                 + "VALUES (?,?,?,?,?,?,?,?,?)", accountId, owner, platformId, name, login, ciphertext, notes, now, now);
         else update(c, "UPDATE am_accounts SET platform_id=?,name=?,login=?,password_cipher=?,notes=?,updated_at=? WHERE id=? AND owner_id=?",
                 platformId, name, login, ciphertext, notes, now, accountId, owner);
+        Sharing.saveTags(c, owner, accountId, body);
     }
 
     private static String platformName(JsonObject body) { return checked(text(body, "name", 1, 120).trim(), 1, 120); }
