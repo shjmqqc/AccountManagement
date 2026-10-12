@@ -10,6 +10,7 @@ public sealed record AccountRecord(string Id, string PlatformId, string Name, st
     string OwnerId = "", string OwnerUsername = "")
 {
     public List<TagRecord> Tags { get; init; } = [];
+    public int? ShareCount { get; init; }
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Login : Name;
     public string Subtitle => $"{PlatformName} · {Login}" + (OwnerUsername.Length > 0 ? $" · 来自 {OwnerUsername}" : "");
     public string UpdatedText => UpdatedAt == 0 ? "—" : DateTimeOffset.FromUnixTimeMilliseconds(UpdatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");

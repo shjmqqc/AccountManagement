@@ -18,23 +18,31 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsReadOnly), nameof(CanEdit), nameof(LibraryTitle), nameof(LibrarySubtitle))]
     private bool showingShared;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LibraryTitle), nameof(LibrarySubtitle))]
+    private bool showingOutgoing;
     [ObservableProperty] private TagRecord? selectedTag;
     public ObservableCollection<TagRecord> TagChoices { get; } = [];
     public bool IsAdmin => User.Role == "admin";
     public bool IsReadOnly => ViewedUser is not null || ShowingShared;
     public bool CanEdit => !IsReadOnly;
-    public string LibraryTitle => ShowingShared ? "分享给我" : ViewedUser is null ? "我的帐号库" : $"{ViewedUser.Username} 的帐号库";
-    public string LibrarySubtitle => ShowingShared ? "接收的帐号 · 只读 · 可由所有者撤销" : IsReadOnly ? "管理员只读查看 · 密码操作会记录审计" : "平台与登录信息，集中整理";
+    public string LibraryTitle => ShowingOutgoing ? "分享给别人" : ShowingShared ? "分享给我" : ViewedUser is null ? "我的帐号库" : $"{ViewedUser.Username} 的帐号库";
+    public string LibrarySubtitle => ShowingOutgoing ? "已分享的帐号 · 查看接收人或撤销分享" : ShowingShared ? "接收的帐号 · 只读 · 可由所有者撤销" : IsReadOnly ? "管理员只读查看 · 密码操作会记录审计" : "平台与登录信息，集中整理";
 
     public Task<bool> SwitchUserAsync(ManagedUser? user) => RunAsync(async () =>
     {
         if (user is not null && !IsAdmin) throw new ArgumentException("此功能仅限管理员使用。");
-        ClearData(); SelectedPlatform = null; ViewedUser = user; ShowingShared = false;
+        ClearData(); SelectedPlatform = null; ViewedUser = user; ShowingShared = false; ShowingOutgoing = false;
         await ReloadAsync();
     });
     public Task<bool> SwitchSharedAsync() => RunAsync(async () =>
     {
-        ClearData(); SelectedPlatform = null; ViewedUser = null; ShowingShared = true;
+        ClearData(); SelectedPlatform = null; ViewedUser = null; ShowingShared = true; ShowingOutgoing = false;
+        await ReloadAsync();
+    });
+    public Task<bool> SwitchOutgoingAsync() => RunAsync(async () =>
+    {
+        ClearData(); SelectedPlatform = null; ViewedUser = null; ShowingShared = false; ShowingOutgoing = true;
         await ReloadAsync();
     });
     public ObservableCollection<PlatformRecord> Platforms { get; } = [];
@@ -115,6 +123,17 @@ public partial class MainViewModel : ObservableObject
         Accounts.Clear();
         var records = ShowingShared ? await api.SharedAccountsAsync() : ViewedUser is null ? await api.AccountsAsync("", null)
             : await api.UserAccountsAsync(ViewedUser.Id, "", null);
+        if (ShowingOutgoing)
+        {
+            if (records.Any(a => a.ShareCount is null)) throw new ArgumentException("请先更新服务器程序，以支持分享给别人的帐号列表。");
+            records = records.Where(a => a.ShareCount > 0).ToList();
+            var selectedPlatformId = SelectedPlatform?.Id;
+            var platforms = (await api.PlatformsAsync())
+                .Select(p => p with { AccountCount = records.Count(a => a.PlatformId == p.Id) }).Where(p => p.AccountCount > 0).ToList();
+            Platforms.Clear(); Platforms.Add(PlatformRecord.All with { AccountCount = records.Count });
+            foreach (var platform in platforms) Platforms.Add(platform);
+            SelectedPlatform = Platforms.FirstOrDefault(p => p.Id == selectedPlatformId) ?? Platforms[0];
+        }
         loadedAccounts = records;
         var tagId = SelectedTag?.Id;
         TagChoices.Clear(); TagChoices.Add(TagRecord.All);

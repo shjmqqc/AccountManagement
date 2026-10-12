@@ -25,7 +25,7 @@ public final class Fixture {
             Database.update(c, "INSERT INTO am_users(id,username,password_hash,role,created_at) VALUES(?,?,?,?,?)",
                 UUID.randomUUID().toString(), "other-test", Crypto.hashPassword("test123456"), "user", System.currentTimeMillis());
         }
-        ApiServer server = new ApiServer(service, Integer.parseInt(args[0]));
+        ApiServer server = new ApiServer(service, "127.0.0.1", Integer.parseInt(args[0]), args.length > 1 ? args[1] : "");
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));
         server.start();
         System.out.println("READY " + server.port());

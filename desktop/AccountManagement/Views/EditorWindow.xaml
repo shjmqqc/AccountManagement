@@ -31,11 +31,44 @@
       <TextBlock Text="备注" Style="{StaticResource FieldLabel}"/>
       <ui:TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" Height="95" VerticalScrollBarVisibility="Auto" MaxLength="2000"/>
       <TextBlock Text="标签（最多 20 个）" Style="{StaticResource FieldLabel}"/>
-      <ListBox x:Name="TagPicker" SelectionMode="Multiple" MaxHeight="145" HorizontalContentAlignment="Stretch" ItemTemplate="{StaticResource TagBadge}"/>
+      <ListBox x:Name="TagPicker" SelectionMode="Multiple" MaxHeight="145" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsPanel="{StaticResource TagWrap}" Background="Transparent" BorderThickness="0" Padding="0">
+       <ListBox.ItemContainerStyle>
+        <Style TargetType="ListBoxItem">
+         <Setter Property="Margin" Value="0,0,8,8"/>
+         <Setter Property="ToolTip" Value="{Binding Name}"/>
+         <Setter Property="Template">
+          <Setter.Value>
+           <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Badge" Background="{Binding Background}" BorderBrush="Transparent" BorderThickness="2" CornerRadius="6" Padding="9,6">
+             <StackPanel Orientation="Horizontal">
+              <TextBlock x:Name="Mark" Text="✓" Visibility="Hidden" Foreground="{Binding Foreground}" Margin="0,0,5,0"/>
+              <TextBlock Text="{Binding Name}" Foreground="{Binding Foreground}" MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+             </StackPanel>
+            </Border>
+            <ControlTemplate.Triggers>
+             <Trigger Property="IsSelected" Value="True"><Setter TargetName="Badge" Property="BorderBrush" Value="{Binding Foreground}"/><Setter TargetName="Mark" Property="Visibility" Value="Visible"/></Trigger>
+             <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Badge" Property="BorderBrush" Value="{Binding Foreground}"/></Trigger>
+             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Badge" Property="Opacity" Value="0.5"/></Trigger>
+            </ControlTemplate.Triggers>
+           </ControlTemplate>
+          </Setter.Value>
+         </Setter>
+        </Style>
+       </ListBox.ItemContainerStyle>
+      </ListBox>
       <TextBlock Text="点击标签选中或取消。创建的标签可用于其他帐号。" FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,8"/>
-      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="88"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="112"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
        <ui:TextBox x:Name="TagNameBox" MaxLength="40" PlaceholderText="新标签名称"/>
-       <ComboBox x:Name="TagColorPicker" Grid.Column="1" SelectedIndex="0" SelectedValuePath="Tag" Margin="6,0"><ComboBoxItem Content="蓝色" Tag="blue"/><ComboBoxItem Content="绿色" Tag="green"/><ComboBoxItem Content="橙色" Tag="orange"/><ComboBoxItem Content="红色" Tag="red"/><ComboBoxItem Content="紫色" Tag="purple"/><ComboBoxItem Content="灰色" Tag="gray"/></ComboBox>
+       <ComboBox x:Name="TagColorPicker" Grid.Column="1" SelectedIndex="0" SelectedValuePath="Color" Margin="6,0" AutomationProperties.Name="标签颜色">
+        <ComboBox.ItemTemplate>
+         <DataTemplate>
+          <StackPanel Orientation="Horizontal">
+           <Border Width="14" Height="14" CornerRadius="3" Background="{Binding Background}" BorderBrush="{Binding Foreground}" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center"/>
+           <TextBlock Text="{Binding Name}" Foreground="{Binding Foreground}"/>
+          </StackPanel>
+         </DataTemplate>
+        </ComboBox.ItemTemplate>
+       </ComboBox>
        <ui:Button Grid.Column="2" Content="创建并选中" Click="CreateTag_Click" Padding="9,4"/>
       </Grid>
      </StackPanel>

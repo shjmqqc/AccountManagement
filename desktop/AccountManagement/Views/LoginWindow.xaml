@@ -18,12 +18,18 @@
      <TextBlock Text="集中整理平台与帐号，&#10;快速找到你需要的登录信息。" Foreground="#CDDCEF" FontSize="13" LineHeight="24"/>
     </StackPanel>
    </Border>
-   <StackPanel Grid.Column="2" VerticalAlignment="Center">
+   <ScrollViewer Grid.Column="2" VerticalAlignment="Center" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="500">
+   <StackPanel>
     <TextBlock Text="欢迎回来" FontSize="26" FontWeight="SemiBold"/>
     <TextBlock Text="使用你的帐号登录" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,16"/>
     <StackPanel x:Name="Fields">
-     <TextBlock Text="服务地址" Style="{StaticResource FieldLabel}"/>
-     <ui:TextBox x:Name="EndpointBox" Text="http://127.0.0.1:18082" AutomationProperties.Name="服务地址"/>
+     <Expander x:Name="ServerSettings" Header="服务器设置" IsExpanded="False">
+      <StackPanel Margin="0,8,0,8">
+       <TextBlock Text="服务地址（保存后无需重复填写）" Style="{StaticResource FieldLabel}"/>
+       <ui:TextBox x:Name="EndpointBox" AutomationProperties.Name="服务地址"/>
+       <ui:Button x:Name="SaveServerButton" Content="保存服务器地址" Click="SaveServer_Click" Margin="0,8,0,0"/>
+      </StackPanel>
+     </Expander>
      <TextBlock Text="用户名" Style="{StaticResource FieldLabel}"/>
      <ui:TextBox x:Name="UsernameBox" MaxLength="100" AutomationProperties.Name="用户名"/>
      <TextBlock Text="登录密码" Style="{StaticResource FieldLabel}"/>
@@ -35,6 +41,7 @@
     <TextBlock x:Name="Notice" TextWrapping="Wrap" Foreground="#9F3A38" FontSize="12" Margin="0,12,0,0"/>
     <TextBlock Text="管理员可查看你保存的平台帐号和密码。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,14,0,0"/>
    </StackPanel>
+   </ScrollViewer>
   </Grid>
  </Grid>
 </ui:FluentWindow>

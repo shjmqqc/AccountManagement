@@ -17,7 +17,13 @@ public partial class LoginWindow : FluentWindow
     public LoginWindow(ApiClient api, SessionStore sessions, string? endpoint = null, string? username = null, string? notice = null)
     {
         InitializeComponent(); this.api = api; this.sessions = sessions;
-        EndpointBox.Text = endpoint ?? api.Endpoint; UsernameBox.Text = username ?? ""; Notice.Text = notice ?? "";
+        EndpointBox.Text = endpoint ?? sessions.LoadEndpoint(); UsernameBox.Text = username ?? ""; Notice.Text = notice ?? "";
+    }
+    private void SaveServer_Click(object sender, RoutedEventArgs e)
+    {
+        try { sessions.SaveEndpoint(EndpointBox.Text); EndpointBox.Text = sessions.LoadEndpoint(); ServerSettings.IsExpanded = false; Notice.Text = "服务器地址已保存，退出登录后仍会保留。"; }
+        catch (ArgumentException error) { Notice.Text = error.Message; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { Notice.Text = "无法保存服务器地址，请检查本机目录权限。"; }
     }
 
     private void Register_Click(object sender, RoutedEventArgs e)
@@ -25,12 +31,14 @@ public partial class LoginWindow : FluentWindow
         try
         {
             api.Configure(EndpointBox.Text);
+            sessions.SaveEndpoint(api.Endpoint);
             var dialog = new RegisterWindow(api) { Owner = this };
             dialog.ShowDialog();
             if (dialog.RegisteredUsername is { } username)
             { UsernameBox.Text = username; PasswordInput.Clear(); Notice.Text = "注册成功，请使用刚设置的密码登录。"; }
         }
         catch (ArgumentException error) { Notice.Text = error.Message; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { Notice.Text = "无法保存服务器地址，请检查本机目录权限。"; }
     }
 
     private async void Login_Click(object sender, RoutedEventArgs e)
@@ -41,6 +49,7 @@ public partial class LoginWindow : FluentWindow
         try
         {
             api.Configure(EndpointBox.Text);
+            sessions.SaveEndpoint(api.Endpoint);
             var login = await api.LoginAsync(UsernameBox.Text.Trim(), PasswordInput.Password);
             PasswordInput.Clear();
             if (login.MustChangePassword)
@@ -59,6 +68,7 @@ public partial class LoginWindow : FluentWindow
             SignedIn?.Invoke(user);
         }
         catch (Exception error) when (error is ApiException or ArgumentException) { Notice.Text = error.Message; api.ClearSession(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { Notice.Text = "无法保存服务器地址，请检查本机目录权限。"; }
         finally { PasswordInput.Clear(); Fields.IsEnabled = true; }
     }
     private void Update_Click(object sender, RoutedEventArgs e)

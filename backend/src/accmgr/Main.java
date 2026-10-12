@@ -73,7 +73,7 @@ public final class Main {
         int port = Integer.parseInt(config.getProperty("http.port", "18082"));
         if (port < 1 || port > 65535) throw new IllegalArgumentException("Invalid HTTP port");
         String host = config.getProperty("http.host", "127.0.0.1").trim();
-        ApiServer server = new ApiServer(service, host, port);
+        ApiServer server = new ApiServer(service, host, port, config.getProperty("http.browserOrigin", ""));
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));
         server.start();
         System.out.println("Core API listening on " + server.address() + " (HTTP; HTTPS can be terminated by Nginx)");

@@ -26,6 +26,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         if (Updates is not null) _ = Updates.CheckAsync();
+        var endpoint = sessions.LoadEndpoint();
         var saved = sessions.Load();
         if (saved is not null)
         {
@@ -38,7 +39,7 @@ public partial class App : Application
             }
             catch (Exception error) when (error is ApiException or ArgumentException) { api.ClearSession(); }
         }
-        OpenLogin(saved?.Endpoint, saved?.Username);
+        OpenLogin(saved?.Endpoint ?? endpoint, saved?.Username);
     }
 
     public void ShowUpdates(Window owner)

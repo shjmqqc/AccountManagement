@@ -45,6 +45,7 @@ public partial class MainWindow : FluentWindow
     }
     private async void ReturnOwn_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchUserAsync(null);
     private async void Shared_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchSharedAsync();
+    private async void Outgoing_Click(object sender, RoutedEventArgs e) => await ViewModel.SwitchOutgoingAsync();
     private async void Share_Click(object sender, RoutedEventArgs e)
     {
         if (ViewModel.IsBusy || ViewModel.IsReadOnly || ViewModel.SelectedAccount is not { } account) return;

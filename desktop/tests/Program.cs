@@ -61,15 +61,27 @@ internal static class Program
         Check(ApiClient.ValidateEndpoint("http://example.com:18082") == "http://example.com:18082/", "Remote HTTP allowed");
         Check(ApiClient.ValidateEndpoint("https://example.com") == "https://example.com/", "HTTPS allowed");
 
-        string sessionDir = Path.GetFullPath("artifacts/test-session");
+        string sessionDir = Path.GetFullPath("artifacts/test-session-" + Guid.NewGuid().ToString("N"));
         var store = new SessionStore(sessionDir);
+        Check(store.LoadEndpoint() == SessionStore.DefaultEndpoint, "First-run server default");
         var saved = new SavedSession(endpoint, "test", "secret-test-token", DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds());
         store.Save(saved);
         Check(store.Load() == saved, "DPAPI session round-trip");
         Check(!Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(sessionDir, "session.bin"))).Contains(saved.Token), "No plaintext token on disk");
         store.Save(saved with { ExpiresAt = 1 }); Check(store.Load() is null, "Expired saved session rejected");
+        File.Delete(Path.Combine(sessionDir, "server.txt"));
+        Check(store.LoadEndpoint() == ApiClient.ValidateEndpoint(endpoint) && store.Load() is null, "Migrate expired legacy address without restoring token");
+        Check(File.ReadAllText(Path.Combine(sessionDir, "server.txt")) == ApiClient.ValidateEndpoint(endpoint), "Address file contains only endpoint");
+        store.SaveEndpoint("https://example.com");
+        Check(new SessionStore(sessionDir).LoadEndpoint() == "https://example.com/", "Explicit address survives new store and overrides legacy session");
+        try { store.SaveEndpoint("https://user:secret@example.com"); throw new Exception("Invalid address accepted"); }
+        catch (ArgumentException) { Check(store.LoadEndpoint() == "https://example.com/", "Invalid address leaves saved address intact"); }
         File.WriteAllText(Path.Combine(sessionDir, "session.bin"), "corrupted"); Check(store.Load() is null, "Corrupted session ignored");
         store.Clear(); Check(store.Load() is null, "Session removed");
+        Check(new SessionStore(sessionDir).LoadEndpoint() == "https://example.com/", "Logout preserves server address");
+        File.WriteAllText(Path.Combine(sessionDir, "server.txt"), "invalid");
+        Check(store.LoadEndpoint() == SessionStore.DefaultEndpoint, "Invalid settings fall back to default");
+        store.SaveEndpoint(endpoint);
 
         using var api = new ApiClient(); api.Configure(endpoint);
         await ExpectApi(401, () => api.LoginAsync("desktop-test", "incorrect"));
@@ -117,7 +129,17 @@ internal static class Program
         Check(((UIElement)window.FindName("SearchButton")).IsEnabled, "Search button enabled after refresh");
         Capture(window, "main", 1320, 820);
         Capture(window, "main-small", 1060, 660);
-        var loginWindow = new LoginWindow(api, store); Capture(loginWindow, "login", 820, 620); loginWindow.Close();
+        var loginWindow = new LoginWindow(api, store);
+        var settings = (System.Windows.Controls.Expander)loginWindow.FindName("ServerSettings");
+        Check(!settings.IsExpanded && ((Wpf.Ui.Controls.TextBox)loginWindow.FindName("EndpointBox")).Text == ApiClient.ValidateEndpoint(endpoint), "Login restores server with settings collapsed");
+        Capture(loginWindow, "login", 820, 620);
+        settings.IsExpanded = true;
+        await Task.Delay(300);
+        Capture(loginWindow, "login-server-settings", 820, 620);
+        ((Wpf.Ui.Controls.TextBox)loginWindow.FindName("EndpointBox")).Text = "https://example.com";
+        ((Wpf.Ui.Controls.Button)loginWindow.FindName("SaveServerButton")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Check(!settings.IsExpanded && new SessionStore(sessionDir).LoadEndpoint() == "https://example.com/", "Save server button persists and collapses settings");
+        loginWindow.Close();
         var editor = new EditorWindow(api, EditorKind.Account, vm.Platforms, account: account); Capture(editor, "edit-account", 530, 680); editor.Close();
         var platformEditor = new EditorWindow(api, EditorKind.Platform, platform: platform); Capture(platformEditor, "edit-platform", 530, 460); platformEditor.Close();
         var passwordEditor = new EditorWindow(api, EditorKind.ChangePassword); Capture(passwordEditor, "change-password", 530, 540); passwordEditor.Close();
@@ -261,6 +283,14 @@ internal static class Program
         Check(matches.Count == 1 && matches[0].Id == (await receiver.MeAsync()).Id, "Exact recipient lookup through client");
         await owner.GrantAsync(accountId, matches[0].Id);
         Check((await owner.SharesAsync(accountId)).Count == 1, "Grant and list recipients");
+        var outgoing = ownWindow.ViewModel;
+        Check(await outgoing.SwitchOutgoingAsync(), "Open outgoing shares");
+        Check(outgoing.Accounts.Single().Id == accountId && outgoing.Accounts[0].ShareCount == 1 && outgoing.CanEdit, "Outgoing lists only owned shared accounts and retains management");
+        Check(outgoing.Platforms[0].AccountCount == 1, "Outgoing platform count includes only shared accounts");
+        outgoing.SelectedAccount = outgoing.Accounts[0];
+        Capture(ownWindow, "shared-by-me", 1060, 660);
+        Check(await outgoing.SwitchSharedAsync() && !outgoing.ShowingOutgoing && outgoing.IsReadOnly, "Switch outgoing to received clears outgoing mode");
+        await outgoing.SwitchOutgoingAsync();
         var shareWindow = new ShareWindow(owner, account, false); await shareWindow.LoadAsync();
         Capture(shareWindow, "share-management", 650, 650); shareWindow.Close();
         var sharedWindow = new MainWindow(receiver, await receiver.MeAsync(), false);
@@ -279,6 +309,10 @@ internal static class Program
         await ExpectApi(404, () => receiver.SaveAccountAsync(account, platformId, account.Name, account.Login, account.Notes, "tamper"));
         await ExpectApi(404, async () => await receiver.GrantAsync(accountId, (await owner.MeAsync()).Id));
         await owner.RevokeShareAsync(accountId, matches[0].Id);
+        await outgoing.RefreshCommand.ExecuteAsync(null);
+        Check(outgoing.Accounts.Count == 0 && outgoing.Platforms[0].AccountCount == 0, "Last revocation removes outgoing entry and count");
+        await outgoing.SwitchUserAsync(null);
+        Check(!outgoing.ShowingOutgoing && outgoing.Accounts.Any(a => a.Id == accountId), "Revoked account remains in own library");
         copied = null;
         await vm.CopyPasswordAsync(value => copied = value);
         Check(copied is null && !vm.PasswordVisible && vm.Accounts.Count == 0, "Revocation prevents copy and clears stale shared UI");

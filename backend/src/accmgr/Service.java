@@ -210,7 +210,8 @@ final class Service {
     Object accounts(Connection c, String owner, String method, JsonObject body, Map<String, String> query) throws Exception {
         if (method.equals("GET")) {
             List<Map<String, Object>> results = rows(c,
-                    "SELECT a.id,a.platform_id,a.name,a.login,a.notes,a.created_at,a.updated_at,p.name AS platform_name "
+                    "SELECT a.id,a.platform_id,a.name,a.login,a.notes,a.created_at,a.updated_at,p.name AS platform_name, "
+                    + "(SELECT COUNT(*) FROM am_account_shares s WHERE s.account_id=a.id) AS share_count "
                     + "FROM am_accounts a JOIN am_platforms p ON p.id=a.platform_id AND p.owner_id=a.owner_id "
                     + "WHERE a.owner_id=? ORDER BY a.updated_at DESC,a.id", owner);
             Sharing.attachTags(c, results);

@@ -39,7 +39,7 @@
     <Grid>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <StackPanel>
-      <WrapPanel Margin="0,0,0,12"><ui:Button Content="我的帐号" Click="ReturnOwn_Click" Padding="8,5"/><ui:Button Content="分享给我" Click="Shared_Click" Padding="8,5" Margin="6,0,0,0"/></WrapPanel>
+      <WrapPanel Margin="0,0,0,12"><ui:Button Content="我的帐号" Click="ReturnOwn_Click" Padding="8,5" Margin="0,0,6,6"/><ui:Button Content="分享给我" Click="Shared_Click" Padding="8,5" Margin="0,0,6,6"/><ui:Button Content="分享给别人" Click="Outgoing_Click" Padding="8,5" Margin="0,0,0,6"/></WrapPanel>
       <TextBlock Text="按标签筛选" Style="{StaticResource FieldLabel}"/>
       <ComboBox ItemsSource="{Binding TagChoices}" SelectedItem="{Binding SelectedTag}" DisplayMemberPath="Name" Margin="0,0,0,16"/>
       <DockPanel Margin="8,0"><ui:Button DockPanel.Dock="Right" Content="＋" ToolTip="新增平台" Click="AddPlatform_Click" Padding="9,3" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}"/><TextBlock Text="平台" Style="{StaticResource PanelHeading}" VerticalAlignment="Center"/></DockPanel>
@@ -71,7 +71,7 @@
        <TextBlock Text="{Binding DetailPlatform}" Foreground="#3269A5" Margin="0,8,0,14"/>
        <TextBlock Text="{Binding SelectedAccount.OwnerUsername, StringFormat=分享人：{0}}" Visibility="{Binding ShowingShared, Converter={StaticResource BoolVisibility}}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
        <ItemsControl ItemsSource="{Binding SelectedAccount.Tags}" ItemTemplate="{StaticResource TagBadge}" ItemsPanel="{StaticResource TagWrap}"/>
-       <ui:Button Content="分享帐号" Click="Share_Click" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+       <ui:Button Content="分享管理" Click="Share_Click" Visibility="{Binding CanEdit, Converter={StaticResource BoolVisibility}}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
        <TextBlock Text="平台网址" Style="{StaticResource FieldLabel}"/>
        <DockPanel><ui:Button DockPanel.Dock="Right" Content="打开" Click="OpenUrl_Click" Padding="10,4" Margin="8,0,0,0"/><TextBlock Text="{Binding DetailUrl}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DetailUrl}" VerticalAlignment="Center"/></DockPanel>
        <TextBlock Text="登录帐号" Style="{StaticResource FieldLabel}"/>

@@ -4,3 +4,6 @@
 /desktop/artifacts/
 /.vs/
 *.user
+/mobile/artifacts/
+/output/playwright/
+/.playwright-cli/

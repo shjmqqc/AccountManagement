@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>帐号管理</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div><span class="eyebrow">ACCOUNT MANAGEMENT</span><h1>帐号管理</h1></div><button id="logout" hidden>退出</button></header>
+    <p id="message" role="status" aria-live="polite"></p>
+    <section id="login-panel" class="panel">
+      <h2>欢迎回来</h2><p class="muted">使用已有帐号，随时查找与管理分享。</p>
+      <form id="login-form">
+        <label>用户名<input id="username" autocomplete="username" maxlength="100" required></label>
+        <label>登录密码<input id="login-password" type="password" autocomplete="current-password" maxlength="256" required></label>
+        <button class="primary full" type="submit">登录</button>
+      </form>
+      <p class="muted small">管理员可查看你保存的平台帐号和密码。</p>
+    </section>
+    <section id="password-panel" class="panel" hidden>
+      <h2>修改登录密码</h2><p class="muted">修改后所有设备需要重新登录。</p>
+      <form id="password-form">
+        <label>原密码<input id="old-password" type="password" autocomplete="current-password" required maxlength="256"></label>
+        <label>新密码（至少 6 位）<input id="new-password" type="password" autocomplete="new-password" required maxlength="256"></label>
+        <label>确认新密码<input id="confirm-password" type="password" autocomplete="new-password" required maxlength="256"></label>
+        <button type="submit" class="primary full">修改并重新登录</button><button id="cancel-password" type="button" class="full">返回</button>
+      </form>
+    </section>
+    <section id="library" hidden>
+      <div class="toolbar"><span id="identity"></span><button id="change-password">修改密码</button></div>
+      <nav aria-label="帐号范围"><button data-scope="own" aria-pressed="true">我的帐号</button><button data-scope="received" aria-pressed="false">分享给我</button><button data-scope="outgoing" aria-pressed="false">分享给别人</button></nav>
+      <div class="search"><input id="search" type="search" placeholder="搜索平台、帐号或备注" aria-label="搜索帐号"><button id="refresh">刷新</button></div>
+      <div class="filters"><label>平台<select id="platform-filter"><option value="">全部平台</option></select></label><label>标签<select id="tag-filter"><option value="">全部标签</option></select></label></div>
+      <p id="count" class="muted"></p><div id="accounts"></div>
+    </section>
+    <section id="detail" class="panel" hidden>
+      <button id="back">← 返回列表</button><h2 id="detail-title"></h2><p id="detail-platform" class="muted"></p><div id="detail-tags"></div>
+      <label>登录帐号</label><div class="value-row"><span id="account-login" class="value"></span><button id="copy-login">复制</button></div>
+      <label>平台密码</label><div class="secret"><span id="secret" class="value">••••••••</span><div class="actions"><button id="reveal">显示密码</button><button id="copy-password">复制密码</button></div></div>
+      <label>平台网址</label><p id="account-url" class="value"></p><label>备注</label><p id="account-notes" class="value notes"></p>
+      <section id="sharing"><h3>分享管理</h3><p class="muted small">接收人只读，可显示和复制密码；你可随时撤销。</p><div id="recipients"></div>
+        <form id="recipient-form"><label>接收人的完整用户名<input id="recipient-name" maxlength="100" required autocomplete="off"></label><button type="submit">查找接收人</button></form><div id="recipient-result"></div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

@@ -44,6 +44,11 @@ public partial class EditorWindow : FluentWindow
             AccountPassword.IsEnabled = account is null;
             if (account is not null) PasswordHint.Text = "未勾选时保留原密码，不会读取或回填原密码。";
             TagPicker.ItemsSource = tags;
+            TagColorPicker.ItemsSource = new[] {
+                new TagRecord("", "蓝色", "blue"), new TagRecord("", "绿色", "green"),
+                new TagRecord("", "橙色", "orange"), new TagRecord("", "红色", "red"),
+                new TagRecord("", "紫色", "purple"), new TagRecord("", "灰色", "gray") };
+            TagColorPicker.SelectedIndex = 0;
             Loaded += async (_, _) => await LoadTagsAsync();
         }
         else { ChangePasswordPanel.Visibility = Visibility.Visible; Height = 540; }

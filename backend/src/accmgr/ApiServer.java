@@ -14,13 +14,26 @@ final class ApiServer implements AutoCloseable {
     private final HttpServer server;
     private final ThreadPoolExecutor executor;
     private final Service service;
+    private final String browserOrigin;
 
     ApiServer(Service service, int port) throws IOException {
         this(service, "127.0.0.1", port);
     }
 
     ApiServer(Service service, String host, int port) throws IOException {
+        this(service, host, port, "");
+    }
+
+    ApiServer(Service service, String host, int port, String browserOrigin) throws IOException {
         this.service = service;
+        this.browserOrigin = browserOrigin.trim();
+        if (!this.browserOrigin.isEmpty()) {
+            URI origin = URI.create(this.browserOrigin);
+            if (!("https".equals(origin.getScheme()) || "http".equals(origin.getScheme()))
+                    || origin.getHost() == null || origin.getUserInfo() != null || !origin.getRawPath().isEmpty()
+                    || origin.getRawQuery() != null || origin.getRawFragment() != null)
+                throw new IllegalArgumentException("Invalid browser origin");
+        }
         if (host == null || host.trim().isEmpty()) throw new IllegalArgumentException("Empty HTTP host");
         server = HttpServer.create(new InetSocketAddress(host.trim(), port), 32);
         executor = new ThreadPoolExecutor(4, 4, 0, TimeUnit.SECONDS,
@@ -42,7 +55,8 @@ final class ApiServer implements AutoCloseable {
             if (path.equals("/health") && exchange.getRequestMethod().equals("GET")) {
                 result = Service.object("status", "ok", "service", "account-management-core");
             } else {
-                if (exchange.getRequestHeaders().getFirst("Origin") != null)
+                String origin = exchange.getRequestHeaders().getFirst("Origin");
+                if (origin != null && (browserOrigin.isEmpty() || !browserOrigin.equals(origin)))
                     throw new Service.Problem(403, "browser_origin_not_allowed");
                 String authorization = exchange.getRequestHeaders().getFirst("Authorization");
                 String token = authorization != null && authorization.startsWith("Bearer ") ? authorization.substring(7) : null;
