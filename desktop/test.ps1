@@ -11,6 +11,8 @@ $sources = @(Get-ChildItem ../backend/src/accmgr/*.java | ForEach-Object { $_.Fu
 if ($LASTEXITCODE -ne 0) { throw 'Fixture compilation failed' }
 & $Dotnet build tests/DesktopChecks.csproj -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Desktop test compilation failed' }
+& $Dotnet tests/bin/Release/net10.0-windows/DesktopChecks.dll --single-instance
+if ($LASTEXITCODE -ne 0) { throw 'Single-instance checks failed' }
 foreach ($scenario in @('login', 'main', 'owned', 'pending', 'logout', 'login-transition')) {
     & $Dotnet tests/bin/Release/net10.0-windows/DesktopChecks.dll --lifecycle $scenario
     if ($LASTEXITCODE -ne 0) { throw "Application lifecycle check failed: $scenario" }

@@ -12,6 +12,10 @@ public sealed record AccountRecord(string Id, string PlatformId, string Name, st
     public List<TagRecord> Tags { get; init; } = [];
     public int? ShareCount { get; init; }
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Login : Name;
+    public IEnumerable<TagRecord> CompactTags => Tags.Take(2);
+    public string ExtraTags => Tags.Count > 2 ? $"+{Tags.Count - 2}" : "";
+    public string TagsSummary => string.Join("、", Tags.Select(t => t.Name));
+    public string PlatformDisplay => PlatformName + (OwnerUsername.Length > 0 ? $" · {OwnerUsername}" : "");
     public string Subtitle => $"{PlatformName} · {Login}" + (OwnerUsername.Length > 0 ? $" · 来自 {OwnerUsername}" : "");
     public string UpdatedText => UpdatedAt == 0 ? "—" : DateTimeOffset.FromUnixTimeMilliseconds(UpdatedAt).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 }

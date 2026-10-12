@@ -19,6 +19,12 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] is "--instance-probe" or "--instance-hold") return SingleInstanceChecks.Probe(args[1], args[0] == "--instance-hold");
+        if (args[0] == "--single-instance")
+        {
+            try { SingleInstanceChecks.Run(Check); Console.WriteLine($"PASS {checks} single-instance checks"); return 0; }
+            catch (Exception e) { Console.Error.WriteLine(e); return 1; }
+        }
         if (args.Length == 2 && args[0] == "--update-package")
         {
             try { PackageUpdateChecks.Run(args[1]).GetAwaiter().GetResult(); return 0; }
@@ -32,7 +38,7 @@ internal static class Program
         int code = 0;
         Dispatcher.CurrentDispatcher.BeginInvoke(async () =>
         {
-            try { await Run(args[0]); Console.WriteLine($"PASS {checks} desktop checks; previews in artifacts/previews"); }
+            try { if (args[0] == "--layout") await AlignmentChecks.Run(Check, Capture); else await Run(args[0]); Console.WriteLine($"PASS {checks} desktop checks; previews in artifacts/previews"); }
             catch (Exception error) { Console.Error.WriteLine(error); code = 1; }
             finally { Dispatcher.ExitAllFrames(); }
         });
@@ -51,6 +57,7 @@ internal static class Program
 
     private static async Task Run(string endpoint)
     {
+        await AlignmentChecks.Run(Check, Capture);
         await UpdateChecks.Run(Check, Capture);
         foreach (var bad in new[] { "https://user:password@example.com", "https://example.com/api", "ftp://localhost", "https://example.com/?token=x" })
         {
@@ -120,6 +127,14 @@ internal static class Program
         vm.SelectedAccount = vm.Accounts.Single(a => a.Id == accountId);
         string? copied = null; await vm.CopyPasswordAsync(value => copied = value);
         Check(copied == "测试密码🔐" && !vm.PasswordVisible, "Copy without revealing; no real clipboard modified in tests");
+        await window.CopyRowAsync(vm.Accounts.Single(a => a.Id == secondId), false, value => copied = value);
+        Check(copied == "personal@example.com" && vm.SelectedAccount?.Id == secondId, "Inline copy selects the clicked row");
+        await window.CopyRowAsync(vm.Accounts.Single(a => a.Id == accountId), true, value => copied = value);
+        Check(copied == "测试密码🔐" && !vm.PasswordVisible, "Inline password copy uses clicked account without revealing");
+        await vm.RevealPasswordCommand.ExecuteAsync(null);
+        window.SetDetailsVisible(false);
+        Check(!vm.PasswordVisible && ((UIElement)window.FindName("DetailPanel")).Visibility == Visibility.Collapsed, "Collapsing details hides secrets");
+        window.SetDetailsVisible(true);
         vm.SearchText = "工作"; await vm.SearchCommand.ExecuteAsync(null); Check(vm.Accounts.Count == 1, "View model search");
         vm.SearchText = ""; await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedAccount = vm.Accounts.Single(a => a.Id == accountId);
@@ -129,6 +144,22 @@ internal static class Program
         Check(((UIElement)window.FindName("SearchButton")).IsEnabled, "Search button enabled after refresh");
         Capture(window, "main", 1320, 820);
         Capture(window, "main-small", 1060, 660);
+        var denseWindow = new MainWindow(api, me, false);
+        foreach (var item in vm.Platforms) denseWindow.ViewModel.Platforms.Add(item);
+        denseWindow.ViewModel.TagChoices.Add(TagRecord.All);
+        var previewTags = new List<TagRecord> { new("preview-red", "正式平台", "red"), new("preview-blue", "测试帐号", "blue"), new("preview-green", "运维", "green") };
+        for (int i = 0; i < 30; i++) denseWindow.ViewModel.Accounts.Add(account with { Id = "preview-" + i, Name = "生产环境帐号 " + (i + 1), Login = "team" + i + "@example.com", Tags = previewTags });
+        denseWindow.ViewModel.SelectedAccount = denseWindow.ViewModel.Accounts[0];
+        Check(denseWindow.ViewModel.SelectedAccount.CompactTags.Count() == 2 && denseWindow.ViewModel.SelectedAccount.ExtraTags == "+1" && denseWindow.ViewModel.SelectedAccount.TagsSummary.Contains("运维"), "Tag summary retains overflow names");
+        Capture(denseWindow, "main-dense", 1320, 820);
+        var table = (System.Windows.Controls.DataGrid)denseWindow.FindName("AccountList");
+        Check(table.ItemContainerGenerator.ContainerFromIndex(16) is System.Windows.Controls.DataGridRow { ActualHeight: 32 }, "Dense layout fits at least seventeen rows");
+        double expandedWidth = table.ActualWidth;
+        denseWindow.SetDetailsVisible(false);
+        Capture(denseWindow, "main-dense-collapsed", 1320, 820);
+        Check(table.ActualWidth > expandedWidth + 250, "Collapsed details return width to table");
+        Capture(denseWindow, "main-dense-small", 1060, 660);
+        denseWindow.Close();
         var loginWindow = new LoginWindow(api, store);
         var settings = (System.Windows.Controls.Expander)loginWindow.FindName("ServerSettings");
         Check(!settings.IsExpanded && ((Wpf.Ui.Controls.TextBox)loginWindow.FindName("EndpointBox")).Text == ApiClient.ValidateEndpoint(endpoint), "Login restores server with settings collapsed");
@@ -341,6 +372,8 @@ internal static class Program
     {
         var root = (FrameworkElement)window.Content;
         root.Measure(new Size(width, height)); root.Arrange(new Rect(0, 0, width, height)); root.UpdateLayout();
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+        root.UpdateLayout();
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         Directory.CreateDirectory("artifacts/previews"); using var file = File.Create($"artifacts/previews/{name}.png"); encoder.Save(file);

@@ -15,6 +15,7 @@ public partial class MainWindow : FluentWindow
 {
     private readonly ApiClient api;
     private bool ended;
+    private double detailWidth = 300;
     public MainViewModel ViewModel { get; }
     public event Action<string>? SignedOut;
 
@@ -121,6 +122,37 @@ public partial class MainWindow : FluentWindow
         await ViewModel.RunAsync(() => { CopyText(account.Login); return Task.CompletedTask; }, "登录帐号已复制");
     }
     private async void CopyPassword_Click(object sender, RoutedEventArgs e) => await ViewModel.CopyPasswordAsync(CopyText);
+    private void ToggleDetails_Click(object sender, RoutedEventArgs e) => SetDetailsVisible(DetailPanel.Visibility != Visibility.Visible);
+    internal void SetDetailsVisible(bool visible)
+    {
+        if (!visible)
+        {
+            detailWidth = Math.Max(280, DetailColumn.ActualWidth);
+            ViewModel.HidePassword();
+        }
+        DetailPanel.Visibility = DetailSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        DetailColumn.MinWidth = visible ? 280 : 0;
+        DetailColumn.Width = new GridLength(visible ? detailWidth : 0);
+        DetailGap.Width = new GridLength(visible ? 8 : 0);
+        AccountColumn.Width = new GridLength(1, GridUnitType.Star);
+        ToggleDetailsButton.Content = visible ? "收起详情" : "展开详情";
+    }
+    private async void CopyRowLogin_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: AccountRecord account }) await CopyRowAsync(account, false, CopyText);
+    }
+    private async void CopyRowPassword_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: AccountRecord account }) await CopyRowAsync(account, true, CopyText);
+    }
+    internal async Task CopyRowAsync(AccountRecord account, bool password, Action<string> copy)
+    {
+        if (ViewModel.IsBusy || !ViewModel.Accounts.Contains(account)) return;
+        ViewModel.SelectedAccount = account;
+        ViewModel.HidePassword();
+        if (password) await ViewModel.CopyPasswordAsync(copy);
+        else await ViewModel.RunAsync(() => { copy(account.Login); return Task.CompletedTask; }, "登录帐号已复制");
+    }
     private static void CopyText(string value)
     {
         if (value.Length == 0) Clipboard.Clear();

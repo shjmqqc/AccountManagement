@@ -14,7 +14,20 @@ public partial class App : Application
     public static void Main(string[] args)
     {
         VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
-        var app = new App(); app.InitializeComponent(); app.Run();
+        using var instance = new SingleInstance();
+        if (!instance.IsOwner) { instance.RequestActivation(); return; }
+        var app = new App(); app.InitializeComponent();
+        var activationTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        activationTimer.Tick += (_, _) =>
+        {
+            if (app.MainWindow is not { IsVisible: true } main || !instance.TakeActivation()) return;
+            if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
+            var target = main.OwnedWindows.Cast<Window>().LastOrDefault(window => window.IsVisible) ?? main;
+            target.Activate();
+        };
+        activationTimer.Start();
+        try { app.Run(); }
+        finally { activationTimer.Stop(); }
     }
     public UpdateViewModel? Updates { get; private set; }
     private readonly ApiClient api;
