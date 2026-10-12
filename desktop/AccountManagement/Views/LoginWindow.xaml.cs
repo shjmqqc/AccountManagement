@@ -61,4 +61,6 @@ public partial class LoginWindow : FluentWindow
         catch (Exception error) when (error is ApiException or ArgumentException) { Notice.Text = error.Message; api.ClearSession(); }
         finally { PasswordInput.Clear(); Fields.IsEnabled = true; }
     }
+    private void Update_Click(object sender, RoutedEventArgs e)
+    { if (Fields.IsEnabled) (Application.Current as App)?.ShowUpdates(this); }
 }

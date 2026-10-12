@@ -19,6 +19,11 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--update-package")
+        {
+            try { PackageUpdateChecks.Run(args[1]).GetAwaiter().GetResult(); return 0; }
+            catch (Exception e) { Console.Error.WriteLine(e); return 1; }
+        }
         if (args.Length == 2 && args[0] == "--lifecycle") return LifecycleChecks.Run(args[1]);
         // Load styles without running production startup or reading the user's saved session.
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -46,6 +51,7 @@ internal static class Program
 
     private static async Task Run(string endpoint)
     {
+        await UpdateChecks.Run(Check, Capture);
         foreach (var bad in new[] { "https://user:password@example.com", "https://example.com/api", "ftp://localhost", "https://example.com/?token=x" })
         {
             try { ApiClient.ValidateEndpoint(bad); throw new Exception("Unsafe endpoint accepted"); }

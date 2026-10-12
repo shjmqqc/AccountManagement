@@ -3,18 +3,29 @@ using System.Windows;
 using AccountManagement.Models;
 using AccountManagement.Services;
 using AccountManagement.Views;
+using AccountManagement.ViewModels;
+using Velopack;
 
 namespace AccountManagement;
 
 public partial class App : Application
 {
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        var app = new App(); app.InitializeComponent(); app.Run();
+    }
+    public UpdateViewModel? Updates { get; private set; }
     private readonly ApiClient api;
     private readonly SessionStore sessions;
-    public App() : this(new ApiClient(), new SessionStore()) { }
+    public App() : this(new ApiClient(), new SessionStore())
+    { Updates = new UpdateViewModel(new DesktopUpdater()); }
     internal App(ApiClient api, SessionStore sessions) { this.api = api; this.sessions = sessions; }
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (Updates is not null) _ = Updates.CheckAsync();
         var saved = sessions.Load();
         if (saved is not null)
         {
@@ -30,6 +41,11 @@ public partial class App : Application
         OpenLogin(saved?.Endpoint, saved?.Username);
     }
 
+    public void ShowUpdates(Window owner)
+    {
+        if (Updates is null || owner.OwnedWindows.Count > 0) return;
+        new UpdateWindow(Updates) { Owner = owner }.ShowDialog();
+    }
     private void OpenLogin(string? endpoint = null, string? username = null, string? notice = null)
     {
         var login = new LoginWindow(api, sessions, endpoint, username, notice);

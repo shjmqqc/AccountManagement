@@ -29,6 +29,11 @@ public partial class MainWindow : FluentWindow
     }
 
     private void EndSession(string notice) { if (ended) return; ended = true; SignedOut?.Invoke(notice); }
+    private void Update_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy) return;
+        ViewModel.HidePassword(); (Application.Current as App)?.ShowUpdates(this);
+    }
     private async void Admin_Click(object sender, RoutedEventArgs e)
     {
         if (!ViewModel.IsAdmin || ViewModel.IsBusy) return;

@@ -7,6 +7,7 @@
 | .NET / WPF | .NET 10；SDK 固定策略见 desktop/global.json | Windows 运行时与界面；[dotnet](https://github.com/dotnet) |
 | CommunityToolkit.Mvvm | 8.4.2 | MVVM；[CommunityToolkit/dotnet](https://github.com/CommunityToolkit/dotnet) |
 | WPF UI / WPF UI Abstractions | 4.3.0 | Windows 控件；[lepoco/wpfui](https://github.com/lepoco/wpfui) |
+| Velopack | 1.2.161 | 安装与更新（MIT）；[velopack/velopack](https://github.com/velopack/velopack)，打包工具固定同版本 |
 | Gson | 2.13.2 | JSON；[google/gson](https://github.com/google/gson) |
 | MySQL Connector/J | 5.1.49 | JDBC 驱动；[上游版本归档与许可说明](https://downloads.mysql.com/archives/c-j/) |
 | H2 | 2.2.224 | 仅测试使用，不放入后端运行包；[h2database](https://github.com/h2database/h2database) |

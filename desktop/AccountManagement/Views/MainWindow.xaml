@@ -29,7 +29,7 @@
     <ui:Button x:Name="AdminButton" Content="管理" Click="Admin_Click" Visibility="{Binding IsAdmin, Converter={StaticResource BoolVisibility}}" Margin="0,0,8,0"/>
     <TextBlock Text="{Binding Identity}" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
     <ui:Button Content="帐户 ▾" Click="UserMenu_Click">
-     <ui:Button.ContextMenu><ContextMenu><MenuItem Header="修改登录密码" Click="ChangePassword_Click"/><Separator/><MenuItem Header="退出登录" Click="Logout_Click"/></ContextMenu></ui:Button.ContextMenu>
+     <ui:Button.ContextMenu><ContextMenu><MenuItem Header="{Binding Updates.MenuText, Source={x:Static Application.Current}, FallbackValue=检查更新}" Click="Update_Click"/><Separator/><MenuItem Header="修改登录密码" Click="ChangePassword_Click"/><Separator/><MenuItem Header="退出登录" Click="Logout_Click"/></ContextMenu></ui:Button.ContextMenu>
     </ui:Button>
    </StackPanel>
   </Grid>
