@@ -14,6 +14,9 @@ final class Service {
     private final String dummyHash;
     private long loginWindow;
     private int loginCount;
+    private DingTalkAuth dingTalk;
+
+    void enableDingTalk(DingTalkClient client) { dingTalk = new DingTalkAuth(db, this, client); }
 
     static final class Problem extends RuntimeException {
         final int status;
@@ -38,6 +41,15 @@ final class Service {
     }
 
     Object execute(String method, String path, String token, JsonObject body, Map<String, String> query) throws Exception {
+        if (path.equals("/api/dingtalk/config") && method.equals("GET"))
+            return dingTalk == null ? object("enabled", false) : object("enabled", true, "corp_id", dingTalk.client.corpId, "client_id", dingTalk.client.clientId);
+        if (path.equals("/api/dingtalk/login") || path.equals("/api/dingtalk/bind")) {
+            if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
+            if (dingTalk == null) throw new Problem(503, "dingtalk_disabled");
+            limitLogin();
+            return dingTalk.login(body, path.endsWith("/bind"));
+        }
+        if (path.equals("/api/dingtalk/binding") && method.equals("DELETE")) limitLogin();
         if (path.equals("/api/login") && method.equals("POST")) {
             limitLogin();
             return login(body);
@@ -59,6 +71,9 @@ final class Service {
                 if (path.startsWith("/api/admin/")) {
                     if (!"admin".equals(user.get("role"))) throw new Problem(403, "admin_required");
                     result = new AdminService(this).execute(c, owner, method, path, body, query);
+                } else if (path.equals("/api/dingtalk/binding")) {
+                    if (dingTalk == null) throw new Problem(503, "dingtalk_disabled");
+                    result = dingTalk.binding(c, user, method, body);
                 } else if (path.equals("/api/me") && method.equals("GET")) {
                     result = object("id", owner, "username", user.get("username"), "role", user.get("role"));
                 } else if (path.equals("/api/logout") && method.equals("POST")) {
@@ -131,32 +146,37 @@ final class Service {
             c.setAutoCommit(false);
             try {
                 Map<String, Object> user = one(c, "SELECT * FROM am_users WHERE username=? FOR UPDATE", username);
-                long now = System.currentTimeMillis();
-                if (user == null || number(user, "active") == 0 || number(user, "locked_until") > now) {
-                    Crypto.verifyPassword(password, dummyHash);
-                    throw new Problem(401, "invalid_credentials");
-                }
-                if (!Crypto.verifyPassword(password, (String) user.get("password_hash"))) {
-                    long failures = number(user, "locked_until") > 0 ? 1 : number(user, "failed_logins") + 1;
-                    update(c, "UPDATE am_users SET failed_logins=?,locked_until=? WHERE id=?",
-                            failures, failures >= 5 ? now + 15 * 60 * 1000 : 0, user.get("id"));
-                    c.commit(); // Failed attempts must survive the rejected login.
-                    throw new Problem(401, "invalid_credentials");
-                }
-                update(c, "UPDATE am_users SET failed_logins=0,locked_until=0 WHERE id=?", user.get("id"));
-                update(c, "DELETE FROM am_sessions WHERE expires_at<=?", now);
-                String token = Crypto.token();
-                long expires = now + SESSION_MILLIS;
-                update(c, "INSERT INTO am_sessions (token_hash,user_id,expires_at) VALUES (?,?,?)",
-                        Crypto.digest(token), user.get("id"), expires);
+                verifyLoginPassword(c, user, password);
+                Object result = newSession(c, user);
                 c.commit();
-                return object("token", token, "expires_at", expires,
-                        "must_change_password", number(user, "must_change_password") != 0);
+                return result;
             } catch (Exception e) {
                 c.rollback();
                 throw e;
             }
         }
+    }
+
+    void verifyLoginPassword(Connection c, Map<String, Object> user, String password) throws Exception {
+        long now = System.currentTimeMillis();
+        if (user == null || number(user, "active") == 0 || number(user, "locked_until") > now) {
+            Crypto.verifyPassword(password, dummyHash); throw new Problem(401, "invalid_credentials");
+        }
+        if (!Crypto.verifyPassword(password, (String) user.get("password_hash"))) {
+            long failures = number(user, "locked_until") > 0 ? 1 : number(user, "failed_logins") + 1;
+            update(c, "UPDATE am_users SET failed_logins=?,locked_until=? WHERE id=?", failures, failures >= 5 ? now + 15 * 60 * 1000 : 0, user.get("id"));
+            c.commit(); // Called before business mutations; retain failed attempts on rejection.
+            throw new Problem(401, "invalid_credentials");
+        }
+        update(c, "UPDATE am_users SET failed_logins=0,locked_until=0 WHERE id=?", user.get("id"));
+    }
+
+    Object newSession(Connection c, Map<String, Object> user) throws Exception {
+        long now = System.currentTimeMillis(), expires = now + SESSION_MILLIS;
+        update(c, "DELETE FROM am_sessions WHERE expires_at<=?", now);
+        String token = Crypto.token();
+        update(c, "INSERT INTO am_sessions (token_hash,user_id,expires_at) VALUES (?,?,?)", Crypto.digest(token), user.get("id"), expires);
+        return object("token", token, "expires_at", expires, "must_change_password", number(user, "must_change_password") != 0);
     }
 
     private Map<String, Object> authenticate(Connection c, String token) throws Exception {

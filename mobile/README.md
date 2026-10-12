@@ -1,6 +1,6 @@
 # 钉钉企业内部 H5 微应用（第一版）
 
-纯静态 HTML/CSS/JavaScript，生产服务器无需安装 Node.js，也无需前端构建。使用现有帐号密码登录，暂不集成钉钉免登，所以不需要 AppKey/AppSecret。
+纯静态 HTML/CSS/JavaScript，生产服务器无需安装 Node.js，也无需前端构建。支持原帐号密码登录；可选启用钉钉绑定与免登，首次验证密码绑定，以后从钉钉进入自动登录。AppSecret 仅保存在服务器，具体升级步骤见 [钉钉免登升级](../backend/DINGTALK-UPGRADE.md)。
 
 ## 功能范围
 
@@ -29,9 +29,9 @@ API 固定走同域 `/accmgr-api/`，Apache 转发到本机 18082，不增加跨
 
 创建“企业内部应用 → H5 微应用”，应用名建议“帐号管理”。将移动端首页设为 `https://www.shjpnn.com/accmgr-mobile/`（以实际可访问的协议为准），PC 首页可使用相同地址，设置可见范围为需要使用的成员，再发布到工作台。具体字段以当前开发者后台为准。
 
-第一版通过工作台入口打开页面，再登录现有帐号；不读取钉钉通讯录、不申请免登权限。钉钉可见范围控制入口，系统内帐号与分享权限仍由后端验证，并不等于钉钉组织身份绑定。不要把 AppSecret 写进网页。
+工作台打开后，未启用免登时使用原帐号密码；启用后通过钉钉授权码验证身份，未绑定者可勾选绑定并验证密码。系统内帐号与分享权限仍由后端验证，钉钉可见范围不代替系统授权。支持密码确认解绑，解绑撤销所有现有会话；主动退出会暂停当前页面会话的自动登录。不要把 AppSecret 写进网页。
 
-参考：[钉钉官方 H5 企业内部应用示例](https://github.com/open-dingtalk/h5app-corp-quickstart)、[官方免登示例（后续阶段）](https://github.com/open-dingtalk/h5app-auth-demo)。上线前需在 Android 和 iPhone 的钉钉内分别验收：登录、筛选、复制兼容、切后台隐藏密码、分享及撤销；本机浏览器验证不能代替真机验收。
+参考：[钉钉官方 H5 企业内部应用示例](https://github.com/open-dingtalk/h5app-corp-quickstart)、[官方免登示例](https://github.com/open-dingtalk/h5app-auth-demo)。上线前需在 Android 和 iPhone 的钉钉内分别验收：登录、绑定与免登、筛选、复制兼容、切后台隐藏密码、分享及撤销；本机浏览器验证不能代替真机验收。
 
 ## 本地验证
 

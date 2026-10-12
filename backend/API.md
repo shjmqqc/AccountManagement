@@ -80,7 +80,20 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 
 首次联调建议只使用虚构帐号和密码。通过接口创建平台和帐号后，退出并重新登录、重启该独立服务，再查看记录和读取密码，确认持久化与解密正常；不得重启旧业务来执行测试。
 
-## 单帐号分享
+## 钉钉企业内部身份绑定与免登
+
+仅配置启用后使用，先执行 005。`GET /api/dingtalk/config` 无需登录，仅返回 enabled、corp_id、client_id，绝不返回 AppSecret。
+
+| 方法 | 路径 | 请求与行为 |
+|---|---|---|
+| POST | /api/dingtalk/login | 无需 Bearer；code 由钉钉 JSAPI 获取，后端换取身份；未绑定返回 bound=false，已绑定返回标准登录会话 |
+| POST | /api/dingtalk/bind | 无需 Bearer；code、username、password，验证系统密码后绑定并返回会话；不会创建系统帐号 |
+| GET | /api/dingtalk/binding | 需 Bearer；返回当前系统帐号在配置企业中的 bound 状态 |
+| DELETE | /api/dingtalk/binding | 需 Bearer；password 再验证，解绑并撤销该帐号所有会话 |
+
+公开登录/绑定及解绑共用登录限流，密码校验共用失败锁定。停用或锁定拒绝免登；强制改密返回 403 dingtalk_password_required，需走原密码登录和改密。绑定冲突返回 409 dingtalk_already_bound；上游不可用返回 502 dingtalk_unavailable；功能关闭返回 503 dingtalk_disabled。前端不得提交可信 userid 或任意企业配置。详细部署见 DINGTALK-UPGRADE.md。
+
+## 单帐号分享（接口）
 
 先应用 `004-sharing-tags.sql`。以下接口均要求有效会话，强制改密限制同其他业务接口。
 

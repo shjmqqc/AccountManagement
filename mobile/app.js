@@ -4,7 +4,17 @@ const API = '/accmgr-api/';
 const $ = id => document.getElementById(id);
 let token = '', user = null, scope = 'own', accounts = [], platforms = [], current = null;
 let busy = false, mustChange = false, secretVersion = 0;
+let dingConfig = null;
+const inDingTalk = /DingTalk/i.test(navigator.userAgent);
+let sdkLoading;
 const errors = {
+  dingtalk_disabled: '钉钉免登尚未启用，请使用帐号密码登录。',
+  dingtalk_unavailable: '暂时无法验证钉钉身份，请使用帐号密码登录或稍后重试。',
+  dingtalk_code_invalid: '钉钉授权已失效，请重新点击钉钉登录。',
+  dingtalk_already_bound: '此钉钉身份或系统帐号已有其他绑定，请先解除原绑定。',
+  dingtalk_login_denied: '帐号已停用或暂时锁定，无法免登。',
+  dingtalk_password_required: '请先用临时密码登录并修改密码，再使用钉钉免登或绑定。',
+  incorrect_password: '原密码不正确。',
   invalid_credentials: '用户名或密码不正确。', invalid_session: '登录已失效，请重新登录。',
   browser_origin_not_allowed: '服务器尚未允许此页面来源，请联系管理员配置。',
   password_change_required: '请先修改临时密码。', invalid_recipient: '接收人不存在、已停用或是你本人。',
@@ -19,7 +29,7 @@ function element(tag, text, className) {
 }
 function hideSecret() { secretVersion++; $('secret').textContent = '••••••••'; $('reveal').textContent = '显示密码'; }
 function show(panel) {
-  hideSecret(); for (const id of ['login-panel', 'password-panel', 'library', 'detail']) $(id).hidden = id !== panel;
+  hideSecret(); for (const id of ['login-panel', 'password-panel', 'library', 'detail', 'unbind-panel']) $(id).hidden = id !== panel;
   $('logout').hidden = !token;
 }
 function clearSession() {
@@ -28,6 +38,7 @@ function clearSession() {
   for (const id of ['detail-title','detail-platform','account-login','account-url','account-notes','identity']) $(id).textContent = '';
   $('detail-tags').replaceChildren();
   $('login-form').reset(); $('password-form').reset(); $('recipient-form').reset();
+  $('unbind-form').reset(); $('unbind-dingtalk').hidden = true;
   try { sessionStorage.removeItem('accmgr.session'); } catch (_) { }
   show('login-panel');
 }
@@ -145,15 +156,61 @@ async function password(copying) {
   if (copying) { await copy(data.password, $('secret')); if ($('secret').textContent !== '••••••••') $('reveal').textContent = '隐藏密码'; }
   else { $('secret').textContent = data.password || '（空密码）'; $('reveal').textContent = '隐藏密码'; }
 }
-$('login-form').onsubmit = event => { event.preventDefault(); run(async () => {
-  const username = $('username').value.trim(), password = $('login-password').value; $('login-password').value = '';
-  const result = await api('api/login', 'POST', {username, password}); token = result.token; mustChange = result.must_change_password;
+async function acceptLogin(result) {
+  token = result.token; mustChange = result.must_change_password;
+  try { sessionStorage.removeItem('accmgr.manualLogout'); } catch (_) { }
   if (mustChange) { show('password-panel'); $('cancel-password').hidden = true; return; }
   user = await api('api/me'); $('identity').textContent = user.username;
   try { sessionStorage.setItem('accmgr.session', JSON.stringify({token, expires: result.expires_at})); } catch (_) { }
   scope = 'own'; updateTabs(); await loadLibrary();
+  await loadBindingStatus();
+}
+async function loadBindingStatus() {
+  $('unbind-dingtalk').hidden = true;
+  if (dingConfig?.enabled) $('unbind-dingtalk').hidden = !(await api('api/dingtalk/binding')).bound;
+}
+function suppressAutoLogin() { try { sessionStorage.setItem('accmgr.manualLogout', '1'); } catch (_) { } }
+function dingCode() {
+  if (!inDingTalk || !dingConfig?.enabled) return Promise.reject(new Error('请从钉钉工作台进入此应用。'));
+  if (!sdkLoading) sdkLoading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => reject(new Error('钉钉组件加载超时，可使用帐号密码登录。')), 10000);
+    script.src = 'https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.31/dingtalk.open.js';
+    script.onload = () => { clearTimeout(timer); resolve(); };
+    script.onerror = () => { clearTimeout(timer); reject(new Error('钉钉组件加载失败，可使用帐号密码登录。')); };
+    document.head.append(script);
+  }).catch(error => { sdkLoading = null; throw error; });
+  return sdkLoading.then(() => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('获取钉钉身份超时，请重试或使用帐号密码登录。')), 10000);
+    const success = result => { clearTimeout(timer); result?.code ? resolve(result.code) : reject(new Error('未获取到钉钉授权码。')); };
+    const fail = () => { clearTimeout(timer); reject(new Error('无法获取钉钉身份，请检查应用配置或使用帐号密码登录。')); };
+    if (typeof window.dd?.requestAuthCode !== 'function') { fail(); return; }
+    try { window.dd.requestAuthCode({corpId: dingConfig.corp_id, clientId: dingConfig.client_id, success, fail}); } catch (_) { fail(); }
+  }));
+}
+async function dingLogin() {
+  const result = await api('api/dingtalk/login', 'POST', {code: await dingCode()});
+  if (result.bound === false) {
+    clearSession(); $('bind-choice').hidden = false;
+    message('首次使用，请填写现有帐号密码并勾选绑定。也可以直接使用密码登录。'); return;
+  }
+  await acceptLogin(result);
+}
+$('ding-login').onclick = () => run(dingLogin);
+$('login-form').onsubmit = event => { event.preventDefault(); run(async () => {
+  const username = $('username').value.trim(), password = $('login-password').value; $('login-password').value = '';
+  if ($('bind-dingtalk').checked && inDingTalk && dingConfig?.enabled) {
+    if (!confirm(`将当前钉钉身份绑定到帐号 ${username}？之后可通过钉钉直接访问该帐号库。`)) return;
+    await acceptLogin(await api('api/dingtalk/bind', 'POST', {code: await dingCode(), username, password}));
+  } else await acceptLogin(await api('api/login', 'POST', {username, password}));
 }); };
-$('logout').onclick = () => run(async () => { try { await api('api/logout', 'POST'); } finally { clearSession(); } });
+$('logout').onclick = () => run(async () => { suppressAutoLogin(); try { await api('api/logout', 'POST'); } finally { clearSession(); } });
+$('unbind-dingtalk').onclick = () => { $('unbind-form').reset(); show('unbind-panel'); };
+$('cancel-unbind').onclick = () => { $('unbind-form').reset(); show('library'); };
+$('unbind-form').onsubmit = event => { event.preventDefault(); run(async () => {
+  const password = $('unbind-password').value; $('unbind-password').value = '';
+  await api('api/dingtalk/binding', 'DELETE', {password}); suppressAutoLogin(); clearSession(); message('已解除钉钉绑定，请重新登录。');
+}); };
 function updateTabs() { for (const button of document.querySelectorAll('[data-scope]')) button.setAttribute('aria-pressed', String(button.dataset.scope === scope)); }
 for (const button of document.querySelectorAll('[data-scope]')) button.onclick = () => run(async () => {
   scope = button.dataset.scope; updateTabs(); $('search').value = ''; $('platform-filter').value = ''; $('tag-filter').value = '';
@@ -181,13 +238,22 @@ $('password-form').onsubmit = event => { event.preventDefault(); run(async () =>
   const old_password = $('old-password').value, new_password = $('new-password').value;
   if ([...new_password].length < 6) throw new Error('新密码至少 6 位。');
   if (new_password !== $('confirm-password').value) throw new Error('两次新密码不一致。');
-  try { await api('api/password', 'POST', {old_password, new_password}); clearSession(); message('密码已修改，请重新登录。'); }
+  try { await api('api/password', 'POST', {old_password, new_password}); suppressAutoLogin(); clearSession(); message('密码已修改，请重新登录。'); }
   finally { $('password-form').reset(); }
 }); };
 document.addEventListener('visibilitychange', () => { if (document.hidden) hideSecret(); });
 window.addEventListener('pagehide', hideSecret);
 run(async () => {
+  try { dingConfig = await api('api/dingtalk/config'); } catch (_) { message('暂时无法加载钉钉登录配置，可使用帐号密码登录。'); }
+  $('ding-login').hidden = !inDingTalk || !dingConfig?.enabled;
+  $('bind-choice').hidden = !inDingTalk || !dingConfig?.enabled;
+  $('ding-hint').hidden = !inDingTalk || !dingConfig?.enabled;
+  $('ding-hint').textContent = '首次绑定需验证已有帐号密码；免登失败时仍可使用密码登录。';
+  let manualLogout = false;
+  try { manualLogout = sessionStorage.getItem('accmgr.manualLogout') === '1'; } catch (_) { }
+  if (manualLogout) { clearSession(); return; }
+  if (inDingTalk && dingConfig?.enabled) { clearSession(); await dingLogin(); return; }
   let saved; try { saved = JSON.parse(sessionStorage.getItem('accmgr.session')); } catch (_) { }
   if (!saved || typeof saved.token !== 'string' || typeof saved.expires !== 'number' || saved.expires <= Date.now()) { clearSession(); return; }
-  token = saved.token; user = await api('api/me'); $('identity').textContent = user.username; await loadLibrary();
+  token = saved.token; user = await api('api/me'); $('identity').textContent = user.username; await loadLibrary(); await loadBindingStatus();
 });

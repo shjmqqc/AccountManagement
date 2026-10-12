@@ -34,6 +34,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Admin tests failed' }
     & "$Jdk/bin/java.exe" -Xmx128m -cp 'build/classes;build/test-classes;build/lib/*;build/test-lib/*' accmgr.SharingTest
     if ($LASTEXITCODE -ne 0) { throw 'Sharing/tag tests failed' }
+    & "$Jdk/bin/java.exe" -Xmx128m -cp 'build/classes;build/test-classes;build/lib/*;build/test-lib/*' accmgr.DingTalkTest
+    if ($LASTEXITCODE -ne 0) { throw 'DingTalk tests failed' }
 }
 Write-Output 'Build complete: build/account-management.jar and build/lib/*.jar'
 New-Item -ItemType Directory -Force build/release/lib | Out-Null
@@ -44,6 +46,7 @@ Copy-Item ../LICENSE,../THIRD_PARTY_NOTICES.md build/release/
 Copy-Item ../database/002-core-schema.sql build/release/
 Copy-Item ../database/003-admin-schema.sql,UPGRADE.md build/release/
 Copy-Item ../database/004-sharing-tags.sql,SHARING-UPGRADE.md build/release/
+Copy-Item ../database/005-dingtalk.sql,DINGTALK-UPGRADE.md build/release/
 Get-ChildItem build/release -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
     $relative = $_.FullName.Substring((Resolve-Path build/release).Path.Length + 1).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative

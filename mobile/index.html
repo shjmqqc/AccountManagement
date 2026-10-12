@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.31/dingtalk.open.js; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>帐号管理</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
@@ -16,9 +16,12 @@
     <p id="message" role="status" aria-live="polite"></p>
     <section id="login-panel" class="panel">
       <h2>欢迎回来</h2><p class="muted">使用已有帐号，随时查找与管理分享。</p>
+      <button id="ding-login" type="button" class="primary full" hidden>使用钉钉身份登录</button>
+      <p id="ding-hint" class="muted small" hidden></p>
       <form id="login-form">
         <label>用户名<input id="username" autocomplete="username" maxlength="100" required></label>
         <label>登录密码<input id="login-password" type="password" autocomplete="current-password" maxlength="256" required></label>
+        <label id="bind-choice" hidden><input id="bind-dingtalk" type="checkbox">验证密码并绑定当前钉钉身份，下次自动登录</label>
         <button class="primary full" type="submit">登录</button>
       </form>
       <p class="muted small">管理员可查看你保存的平台帐号和密码。</p>
@@ -34,10 +37,15 @@
     </section>
     <section id="library" hidden>
       <div class="toolbar"><span id="identity"></span><button id="change-password">修改密码</button></div>
+      <button id="unbind-dingtalk" type="button" hidden>解除钉钉绑定</button>
       <nav aria-label="帐号范围"><button data-scope="own" aria-pressed="true">我的帐号</button><button data-scope="received" aria-pressed="false">分享给我</button><button data-scope="outgoing" aria-pressed="false">分享给别人</button></nav>
       <div class="search"><input id="search" type="search" placeholder="搜索平台、帐号或备注" aria-label="搜索帐号"><button id="refresh">刷新</button></div>
       <div class="filters"><label>平台<select id="platform-filter"><option value="">全部平台</option></select></label><label>标签<select id="tag-filter"><option value="">全部标签</option></select></label></div>
       <p id="count" class="muted"></p><div id="accounts"></div>
+    </section>
+    <section id="unbind-panel" class="panel" hidden>
+      <h2>解除钉钉绑定</h2><p class="muted">解除后所有设备需要重新登录，下次钉钉免登需要重新验证密码并绑定。</p>
+      <form id="unbind-form"><label>当前登录密码<input id="unbind-password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary full" type="submit">确认解绑并退出</button><button id="cancel-unbind" class="full" type="button">取消</button></form>
     </section>
     <section id="detail" class="panel" hidden>
       <button id="back">← 返回列表</button><h2 id="detail-title"></h2><p id="detail-platform" class="muted"></p><div id="detail-tags"></div>

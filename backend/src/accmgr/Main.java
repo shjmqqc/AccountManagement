@@ -42,6 +42,10 @@ public final class Main {
         Crypto crypto = new Crypto(key);
         Arrays.fill(key, (byte) 0);
         Service service = new Service(db, crypto);
+        if (Boolean.parseBoolean(config.getProperty("dingtalk.enabled", "false"))) {
+            service.enableDingTalk(new DingTalkClient(Database.required(config, "dingtalk.corpId"),
+                    Database.required(config, "dingtalk.clientId"), Database.required(config, "dingtalk.clientSecret")));
+        }
         if (args[0].equals("init-admin")) {
             Console console = System.console();
             if (console == null) throw new IllegalStateException("Interactive terminal required");
@@ -67,6 +71,8 @@ public final class Main {
             Database.rows(c, "SELECT id FROM am_tags WHERE 1=0");
             Database.rows(c, "SELECT tag_id FROM am_account_tags WHERE 1=0");
             Database.rows(c, "SELECT recipient_id FROM am_account_shares WHERE 1=0");
+            if (Boolean.parseBoolean(config.getProperty("dingtalk.enabled", "false")))
+                Database.rows(c, "SELECT corp_id,ding_user_id,user_id FROM am_dingtalk_bindings WHERE 1=0");
             Map<String, Object> sample = Database.one(c, "SELECT id,owner_id,password_cipher FROM am_accounts LIMIT 1");
             if (sample != null) crypto.decrypt((String) sample.get("password_cipher"), sample.get("owner_id") + ":" + sample.get("id"));
         }
