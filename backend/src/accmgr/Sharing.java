@@ -80,7 +80,7 @@ final class Sharing {
     }
 
     static Object tags(Connection c, String owner, String method, JsonObject body) throws Exception {
-        if (method.equals("GET")) return rows(c, "SELECT id,name,color FROM am_tags WHERE owner_id=? ORDER BY name,id", owner);
+        if (method.equals("GET")) return rows(c, "SELECT t.id,t.name,t.color,(SELECT COUNT(*) FROM am_account_tags a WHERE a.tag_id=t.id) AS account_count FROM am_tags t WHERE t.owner_id=? ORDER BY t.name,t.id", owner);
         requireMethod(method, "POST");
         String name = text(body, "name", 1, 40).trim();
         if (name.isEmpty()) throw new Problem(400, "invalid_tag_name");
@@ -91,6 +91,21 @@ final class Sharing {
         String tag = UUID.randomUUID().toString();
         update(c, "INSERT INTO am_tags(id,owner_id,name,color) VALUES(?,?,?,?)", tag, owner, name, color);
         return object("id", tag, "name", name, "color", color);
+    }
+
+    static Object tag(Connection c, String owner, String tag, String method, JsonObject body) throws Exception {
+        if (one(c, "SELECT id FROM am_tags WHERE id=? AND owner_id=?", tag, owner) == null) throw new Problem(404, "not_found");
+        if (method.equals("DELETE")) {
+            update(c, "DELETE FROM am_tags WHERE id=? AND owner_id=?", tag, owner);
+        } else if (method.equals("PUT")) {
+            String name = text(body, "name", 1, 40).trim(), color = text(body, "color", 1, 10);
+            if (name.isEmpty()) throw new Problem(400, "invalid_tag_name");
+            if (!Arrays.asList("blue", "green", "orange", "red", "purple", "gray").contains(color)) throw new Problem(400, "invalid_tag_color");
+            if (one(c, "SELECT id FROM am_tags WHERE owner_id=? AND name=? AND id<>?", owner, name, tag) != null)
+                throw new Problem(409, "tag_name_taken");
+            update(c, "UPDATE am_tags SET name=?,color=? WHERE id=? AND owner_id=?", name, color, tag, owner);
+        } else throw new Problem(405, "method_not_allowed");
+        return object("ok", true);
     }
 
     static void saveTags(Connection c, String owner, String account, JsonObject body) throws Exception {

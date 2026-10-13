@@ -95,6 +95,7 @@ internal static class Program
         await ExpectApi(401, () => api.LoginAsync("desktop-test", "incorrect"));
         var login = await api.LoginAsync("desktop-test", "test123456");
         var me = await api.MeAsync(); Check(me.Username == "desktop-test", "Login and identity");
+        await ImportChecks.Run(api, Check, Capture);
         using var restored = new ApiClient(); restored.Configure(endpoint, login.Token); Check((await restored.MeAsync()).Id == me.Id, "Session restore against server");
         string platformId = await api.SavePlatformAsync(null, "阿里云", "https://www.aliyun.com");
         await ExpectApi(409, () => api.SavePlatformAsync(null, "阿里云", ""));

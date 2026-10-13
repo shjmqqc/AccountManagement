@@ -31,6 +31,7 @@ public sealed record RecipientRecord(string Id, string Username, int Active = 1)
 }
 public sealed record TagRecord(string Id, string Name, string Color)
 {
+    public int AccountCount { get; init; }
     public string Background => Color switch {
         "green" => "#DCF3E5", "orange" => "#FFF0D6", "red" => "#FCE0E0",
         "purple" => "#EEE3FA", "gray" => "#E9EDF2", _ => "#DCEEFF" };

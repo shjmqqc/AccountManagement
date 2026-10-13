@@ -52,6 +52,11 @@ public sealed class ApiClient : IDisposable
     public Task<UserRecord> MeAsync() => SendAsync<UserRecord>(HttpMethod.Get, "api/me");
     public Task<List<TagRecord>> TagsAsync() => SendAsync<List<TagRecord>>(HttpMethod.Get, "api/tags");
     public Task<TagRecord> CreateTagAsync(string name, string color) => SendAsync<TagRecord>(HttpMethod.Post, "api/tags", new { name, color });
+    public Task UpdateTagAsync(string id, string name, string color) => SendAsync<JsonElement>(HttpMethod.Put, "api/tags/" + id, new { name, color });
+    public Task DeleteTagAsync(string id) => SendAsync<JsonElement>(HttpMethod.Delete, "api/tags/" + id);
+    public Task<ImportResponse> ImportAccountAsync(ImportRow row) => SendAsync<ImportResponse>(HttpMethod.Post, "api/accounts/import", new {
+        platform_name = row.Platform, platform_url = row.Url, name = row.Name, login = row.Login,
+        password = row.Password, notes = row.Notes, tag_names = row.TagNames });
     public Task<List<RecipientRecord>> FindRecipientsAsync(string username) => SendAsync<List<RecipientRecord>>(HttpMethod.Get, "api/share-recipients?q=" + Uri.EscapeDataString(username.Trim()));
     public Task<List<RecipientRecord>> SharesAsync(string accountId) => SendAsync<List<RecipientRecord>>(HttpMethod.Get, $"api/accounts/{accountId}/shares");
     public Task GrantAsync(string accountId, string recipientId) => SendAsync<JsonElement>(HttpMethod.Post, $"api/accounts/{accountId}/shares", new { recipientId });
@@ -136,6 +141,7 @@ public sealed class ApiClient : IDisposable
         "invalid_recipient" => "接收人不可用，不能分享给自己或已停用的用户。",
         "invalid_tag_ids" => "标签不可用或超过 20 个，请刷新后重新选择。",
         "invalid_tag_color" => "请选择预设标签颜色。",
+        "tag_name_taken" => "已有同名标签，请更换名称。",
         "concurrent_change_retry" => "同时有其他操作正在修改数据，请刷新后重试。",
         "login_required" => "登录已失效，请重新登录。",
         "password_change_required" => "请先修改临时登录密码。",

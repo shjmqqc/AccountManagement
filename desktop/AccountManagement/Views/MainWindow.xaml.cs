@@ -77,6 +77,22 @@ public partial class MainWindow : FluentWindow
         if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
         else if (dialog.Submitted) { ViewModel.ClearChecks(); await ViewModel.RefreshCommand.ExecuteAsync(null); }
     }
+    private async void Import_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || !ViewModel.CanEdit) return;
+        ViewModel.HidePassword();
+        var dialog = new ImportWindow(api) { Owner = this }; dialog.ShowDialog();
+        if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
+        else if (dialog.Submitted) await ViewModel.SwitchUserAsync(null);
+    }
+    private async void ManageTags_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || !ViewModel.CanEdit) return;
+        ViewModel.HidePassword();
+        var dialog = new TagManagerWindow(api) { Owner = this }; dialog.ShowDialog();
+        if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
+        else await ViewModel.RefreshCommand.ExecuteAsync(null);
+    }
     private async void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is null || ViewModel.IsBusy || ViewModel.SelectedPlatform is null) return;

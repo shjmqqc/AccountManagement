@@ -119,11 +119,21 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 
 | 方法 | 路径 | 请求 / 返回 |
 |---|---|---|
-| GET | /api/tags | 本人的可复用标签目录，数组元素为 id、name、color |
+| GET | /api/tags | 本人的可复用标签目录，数组元素为 id、name、color、account_count（使用帐号数） |
 | POST | /api/tags | `{ "name": "测试帐号", "color": "blue" }`；返回标签对象；同用户同名返回原标签及原颜色 |
+| PUT | /api/tags/{id} | 所有者修改 name、color；同名其他标签返回 409 tag_name_taken |
+| DELETE | /api/tags/{id} | 所有者删除标签并解除全部关联，保留帐号及分享授权 |
 
-名称去除首尾空白后不能为空，输入最多 40 个 Unicode 字符；颜色限定 blue、green、orange、red、purple、gray。标签目录按用户隔离，不能给帐号绑定他人的标签。当前不提供目录标签重命名、改色或删除接口。
+名称去除首尾空白后不能为空，输入最多 40 个 Unicode 字符；颜色限定 blue、green、orange、red、purple、gray。标签目录按用户隔离，不能给帐号绑定他人的标签，不能修改或删除他人的标签。改名/改色后所有关联帐号及只读接收人刷新可见，不合并同名标签。
 
 新增/编辑帐号可传 `tag_ids: ["标签UUID", "标签UUID"]`，每帐号最多 20 个。传空数组移除该帐号的所有标签；不传则保留已有标签，兼容旧客户端。绑定与帐号保存同事务，无效标签导致整次保存回滚。取消帐号表单不删除已独立创建的目录标签。
 
 本人、管理员查看、收到的帐号列表和详情均包含 `tags: [{"id":"…","name":"测试帐号","color":"blue"}]`，无标签为空数组。列表 `tag_id` 为单标签筛选，与 q/platform_id 的结果取交集；有非空 q 仍忽略 platform_id。关键词搜索不包含标签文字。收到的标签只展示和筛选，接收人不能修改。
+
+## Excel 逐行导入
+
+`POST /api/accounts/import`，需 Bearer；JSON 字段：`platform_name`、`login` 必填，`platform_url`、`name`、`password`、`notes` 可选，`tag_names` 为最多 20 个标签名称的数组。
+
+同用户下查找平台，存在则保留原地址，不存在则创建；同平台/登录帐号/帐号名称已有记录返回 `{ "status": "skipped" }`，不修改任何已有数据。新建返回 `{ "status": "created", "id": "…" }`。标签同名复用原色，新标签默认蓝色。行内全部写入同一事务；失败时平台、标签、帐号一起回滚。所有者来自会话，客户端不能指定他人帐号库；沿用 006 的所有者行锁保证并发判重。
+
+Windows 先本地解析与预览 xlsx，再逐行调用此接口。Excel 文件不上传服务器；接口不接受整份文件或批量数组。

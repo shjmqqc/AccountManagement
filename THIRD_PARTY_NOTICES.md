@@ -8,6 +8,10 @@
 | CommunityToolkit.Mvvm | 8.4.2 | MVVM；[CommunityToolkit/dotnet](https://github.com/CommunityToolkit/dotnet) |
 | WPF UI / WPF UI Abstractions | 4.3.0 | Windows 控件；[lepoco/wpfui](https://github.com/lepoco/wpfui) |
 | Velopack | 1.2.161 | 安装与更新（MIT）；[velopack/velopack](https://github.com/velopack/velopack)，打包工具固定同版本 |
+| ClosedXML / ClosedXML.Parser | 0.105.1 / 2.0.0 | Excel 模板与导入（MIT）；[ClosedXML](https://github.com/ClosedXML/ClosedXML) |
+| DocumentFormat.OpenXml / Framework | 3.1.1 | Excel 文件读写（MIT）；[Open XML SDK](https://github.com/dotnet/Open-XML-SDK) |
+| ExcelNumberFormat / RBush.Signed | 1.1.0 / 4.0.0 | ClosedXML 依赖（MIT）；[ExcelNumberFormat](https://github.com/andersnm/ExcelNumberFormat)、[RBush](https://github.com/viceroypenguin/RBush) |
+| SixLabors.Fonts | 1.0.0 | ClosedXML 字体支持；此固定版本为 Apache-2.0，[Fonts](https://github.com/SixLabors/Fonts/tree/v1.0.0) |
 | Gson | 2.13.2 | JSON；[google/gson](https://github.com/google/gson) |
 | MySQL Connector/J | 5.1.49 | JDBC 驱动；[上游版本归档与许可说明](https://downloads.mysql.com/archives/c-j/) |
 | H2 | 2.2.224 | 仅测试使用，不放入后端运行包；[h2database](https://github.com/h2database/h2database) |

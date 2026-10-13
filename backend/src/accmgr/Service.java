@@ -95,6 +95,8 @@ final class Service {
                     result = new Sharing(this).recipients(c, owner, method, query);
                 } else if (path.equals("/api/tags")) {
                     result = Sharing.tags(c, owner, method, body);
+                } else if (path.startsWith("/api/tags/")) {
+                    result = Sharing.tag(c, owner, id(path.substring(10)), method, body);
                 } else if (path.equals("/api/shared/accounts") || path.startsWith("/api/shared/accounts/")) {
                     result = new Sharing(this).received(c, owner, method,
                             path.equals("/api/shared/accounts") ? "" : path.substring(21), body, query);
@@ -102,6 +104,9 @@ final class Service {
                     result = platforms(c, owner, method, body);
                 } else if (path.startsWith("/api/platforms/")) {
                     result = platform(c, owner, id(path.substring(15)), method, body);
+                } else if (path.equals("/api/accounts/import")) {
+                    if (!method.equals("POST")) throw new Problem(405, "method_not_allowed");
+                    result = importAccount(c, owner, body);
                 } else if (path.equals("/api/accounts")) {
                     result = accounts(c, owner, method, body, query);
                 } else if (path.startsWith("/api/accounts/")) {
@@ -281,6 +286,38 @@ final class Service {
         else update(c, "UPDATE am_accounts SET platform_id=?,name=?,login=?,password_cipher=?,notes=?,updated_at=? WHERE id=? AND owner_id=?",
                 platformId, name, login, ciphertext, notes, now, accountId, owner);
         Sharing.saveTags(c, owner, accountId, body);
+    }
+
+    private Object importAccount(Connection c, String owner, JsonObject body) throws Exception {
+        String platformName = checked(text(body, "platform_name", 1, 120).trim(), 1, 120);
+        String name = optional(body, "name", 120);
+        String login = checked(text(body, "login", 1, 160).trim(), 1, 160);
+        Map<String, Object> platform = one(c, "SELECT id FROM am_platforms WHERE owner_id=? AND name=?", owner, platformName);
+        if (platform != null && one(c, "SELECT id FROM am_accounts WHERE platform_id=? AND login=? AND name=?",
+                platform.get("id"), login, name) != null) return object("status", "skipped");
+        String platformId;
+        if (platform == null) {
+            platformId = UUID.randomUUID().toString();
+            JsonObject platformBody = new JsonObject();
+            platformBody.addProperty("url", optional(body, "platform_url", 1000));
+            long now = System.currentTimeMillis();
+            update(c, "INSERT INTO am_platforms(id,owner_id,name,url,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                    platformId, owner, platformName, url(platformBody), now, now);
+        } else platformId = (String) platform.get("id");
+        JsonArray tagIds = new JsonArray();
+        if (body.has("tag_names")) {
+            JsonElement values = body.get("tag_names");
+            if (!values.isJsonArray() || values.getAsJsonArray().size() > 20) throw new Problem(400, "invalid_tag_ids");
+            for (JsonElement value : values.getAsJsonArray()) {
+                JsonObject tagBody = new JsonObject(); tagBody.add("name", value); tagBody.addProperty("color", "blue");
+                @SuppressWarnings("unchecked") Map<String, Object> tag = (Map<String, Object>) Sharing.tags(c, owner, "POST", tagBody);
+                tagIds.add((String) tag.get("id"));
+            }
+        }
+        JsonObject accountBody = body.deepCopy(); accountBody.addProperty("platform_id", platformId); accountBody.add("tag_ids", tagIds);
+        String accountId = UUID.randomUUID().toString();
+        saveAccount(c, owner, accountId, accountBody, true, null);
+        return object("status", "created", "id", accountId);
     }
 
     private static String platformName(JsonObject body) { return checked(text(body, "name", 1, 120).trim(), 1, 120); }
