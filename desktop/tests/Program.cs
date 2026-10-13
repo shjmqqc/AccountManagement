@@ -58,6 +58,7 @@ internal static class Program
     private static async Task Run(string endpoint)
     {
         await AlignmentChecks.Run(Check, Capture);
+        await BatchShareChecks.Failures(Check);
         await UpdateChecks.Run(Check, Capture);
         foreach (var bad in new[] { "https://user:password@example.com", "https://example.com/api", "ftp://localhost", "https://example.com/?token=x" })
         {
@@ -314,6 +315,7 @@ internal static class Program
         Check(matches.Count == 1 && matches[0].Id == (await receiver.MeAsync()).Id, "Exact recipient lookup through client");
         await owner.GrantAsync(accountId, matches[0].Id);
         Check((await owner.SharesAsync(accountId)).Count == 1, "Grant and list recipients");
+        await BatchShareChecks.Integration(owner, receiver, ownWindow, account, matches[0], Check, Capture);
         var outgoing = ownWindow.ViewModel;
         Check(await outgoing.SwitchOutgoingAsync(), "Open outgoing shares");
         Check(outgoing.Accounts.Single().Id == accountId && outgoing.Accounts[0].ShareCount == 1 && outgoing.CanEdit, "Outgoing lists only owned shared accounts and retains management");

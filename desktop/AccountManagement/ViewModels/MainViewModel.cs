@@ -47,6 +47,23 @@ public partial class MainViewModel : ObservableObject
     });
     public ObservableCollection<PlatformRecord> Platforms { get; } = [];
     public ObservableCollection<AccountRecord> Accounts { get; } = [];
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CheckedCount), nameof(CanBatchShare))]
+    private HashSet<string> checkedAccountIds = [];
+    public int CheckedCount => CheckedAccountIds.Count;
+    public bool CanBatchShare => CanEdit && CheckedCount > 0;
+    public void ClearChecks() => CheckedAccountIds = [];
+    public void ToggleCheck(AccountRecord account)
+    {
+        if (!CanEdit || IsBusy || !Accounts.Contains(account)) return;
+        var ids = new HashSet<string>(CheckedAccountIds);
+        if (!ids.Add(account.Id)) ids.Remove(account.Id);
+        CheckedAccountIds = ids;
+    }
+    public void CheckAll()
+    {
+        if (CanEdit && !IsBusy) CheckedAccountIds = Accounts.Select(a => a.Id).ToHashSet();
+    }
     public event Action? SessionExpired;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsIdle))]
@@ -74,7 +91,9 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(ApiClient api, UserRecord user) { this.api = api; User = user; }
 
     partial void OnSelectedAccountChanged(AccountRecord? value) { HidePassword(); }
-    partial void OnSelectedTagChanged(TagRecord? value) { if (IsIdle) ApplyFilter(); }
+    partial void OnSelectedTagChanged(TagRecord? value) { ClearChecks(); if (IsIdle) ApplyFilter(); }
+    partial void OnSearchTextChanged(string value) => ClearChecks();
+    partial void OnSelectedPlatformChanged(PlatformRecord? value) => ClearChecks();
     public void HidePassword() { selectionVersion++; PasswordDisplay = "••••••••"; PasswordVisible = false; }
 
     public async Task<bool> RunAsync(Func<Task> action, string? success = null)
@@ -118,6 +137,7 @@ public partial class MainViewModel : ObservableObject
 
     public async Task LoadAccountsAsync(string? selectAccountId = null)
     {
+        ClearChecks();
         HidePassword();
         SelectedAccount = null;
         Accounts.Clear();
@@ -145,6 +165,7 @@ public partial class MainViewModel : ObservableObject
 
     private void ApplyFilter(string? selectAccountId = null)
     {
+        ClearChecks();
         HidePassword(); SelectedAccount = null; Accounts.Clear();
         var query = SearchText.Trim();
         var records = loadedAccounts.Where(a => (query.Length > 0
@@ -188,6 +209,7 @@ public partial class MainViewModel : ObservableObject
 
     public void ClearData()
     {
+        ClearChecks();
         loadedAccounts.Clear();
         HidePassword(); SelectedAccount = null; Accounts.Clear(); Platforms.Clear(); SearchText = ""; TagChoices.Clear(); SelectedTag = null;
     }

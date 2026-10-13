@@ -23,6 +23,10 @@ public partial class MainWindow : FluentWindow
     {
         InitializeComponent(); this.api = api;
         ViewModel = new MainViewModel(api, user); DataContext = ViewModel;
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.CanEdit)) BatchSelectColumn.Visibility = ViewModel.CanEdit ? Visibility.Visible : Visibility.Collapsed;
+        };
         ViewModel.SessionExpired += () => EndSession("登录已失效，请重新登录。");
         if (loadOnOpen) Loaded += async (_, _) => await ViewModel.RefreshCommand.ExecuteAsync(null);
         Deactivated += (_, _) => ViewModel.HidePassword();
@@ -55,6 +59,23 @@ public partial class MainWindow : FluentWindow
         dialog.ShowDialog();
         if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
         else await ViewModel.RefreshCommand.ExecuteAsync(null);
+    }
+    private void AccountCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: AccountRecord account }) ViewModel.ToggleCheck(account);
+    }
+    private void CheckAll_Click(object sender, RoutedEventArgs e) => ViewModel.CheckAll();
+    private void ClearChecks_Click(object sender, RoutedEventArgs e) => ViewModel.ClearChecks();
+    private async void BatchShare_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || !ViewModel.CanBatchShare) return;
+        var accounts = ViewModel.Accounts.Where(a => ViewModel.CheckedAccountIds.Contains(a.Id)).ToArray();
+        if (accounts.Length == 0) return;
+        ViewModel.HidePassword();
+        var dialog = new BatchShareWindow(api, accounts) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.SessionExpired) EndSession("登录已失效，请重新登录。");
+        else if (dialog.Submitted) { ViewModel.ClearChecks(); await ViewModel.RefreshCommand.ExecuteAsync(null); }
     }
     private async void Platform_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

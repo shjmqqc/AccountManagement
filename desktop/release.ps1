@@ -1,5 +1,5 @@
 #requires -Version 7.2
-param([string]$Version = '1.1.6', [string]$Dotnet = '', [string]$Notes = "$PSScriptRoot/release-notes-1.1.6.md",
+param([string]$Version = '1.1.7', [string]$Dotnet = '', [string]$Notes = "$PSScriptRoot/release-notes-1.1.7.md",
       [string]$KeyPath = "$PSScriptRoot/../.tools/update-signing/private.dpapi")
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot

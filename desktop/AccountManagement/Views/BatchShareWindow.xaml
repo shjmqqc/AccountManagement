@@ -1,0 +1,18 @@
+<ui:FluentWindow x:Class="AccountManagement.Views.BatchShareWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" Title="批量分享" Width="820" Height="760" MinWidth="720" MinHeight="640"
+ WindowStartupLocation="CenterOwner" ExtendsContentIntoTitleBar="True" FontFamily="Microsoft YaHei UI">
+ <Grid Background="#F7F9FC"><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ui:TitleBar Title="批量分享"/>
+  <Grid Grid.Row="1" Margin="24,12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="130"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="85"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+   <StackPanel><TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold"/><TextBlock Text="接收人可查看和复制最新密码；只能由所有者修改帐号及撤销分享。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,10"/></StackPanel>
+   <ListBox Grid.Row="1" x:Name="AccountList" HorizontalContentAlignment="Stretch"><ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding PlatformName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding DisplayName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Login, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate></ListBox>
+   <TextBlock Grid.Row="2" Text="接收人（输入完整用户名，查找后添加，可添加多人）" Style="{StaticResource FieldLabel}"/>
+   <Grid Grid.Row="3" x:Name="SearchFields" Margin="0,6,0,8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ui:TextBox x:Name="UsernameBox" MaxLength="100" PlaceholderText="完整用户名"/><ui:Button Grid.Column="1" Content="查找" Click="Search_Click" Margin="8,0"/><ComboBox Grid.Column="2" x:Name="RecipientPicker" DisplayMemberPath="Username"/><ui:Button Grid.Column="3" Content="添加" Click="Add_Click" Margin="8,0,0,0"/></Grid>
+   <DockPanel Grid.Row="4"><ui:Button DockPanel.Dock="Right" x:Name="RemoveButton" Content="移除所选" Click="Remove_Click" Margin="8,0,0,0" VerticalAlignment="Top"/><ListBox x:Name="RecipientList" DisplayMemberPath="Username"/></DockPanel>
+   <TextBlock Grid.Row="5" Text="执行结果（按帐号与接收人逐项记录）" Style="{StaticResource FieldLabel}"/>
+   <ListBox Grid.Row="6" x:Name="ResultList" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><StackPanel Margin="0,3"><TextBlock TextWrapping="Wrap"><Run Text="{Binding State, Mode=OneWay}" FontWeight="SemiBold"/><Run Text=" · "/><Run Text="{Binding Platform, Mode=OneWay}"/><Run Text=" / "/><Run Text="{Binding Account, Mode=OneWay}"/><Run Text="（"/><Run Text="{Binding Login, Mode=OneWay}"/><Run Text="） → "/><Run Text="{Binding Recipient, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding Detail, Mode=OneWay}" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+  </Grid>
+  <StackPanel Grid.Row="2" Margin="24,0,24,18"><TextBlock x:Name="Notice" Text="核对帐号清单并添加接收人，提交前还会确认分享范围。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ui:Button x:Name="SubmitButton" Content="确认分享…" Click="Submit_Click" Appearance="Primary" Background="#0067C0" Foreground="White"/><ui:Button x:Name="CloseButton" Content="关闭" Click="Close_Click" Margin="8,0,0,0"/></StackPanel></StackPanel>
+ </Grid>
+</ui:FluentWindow>

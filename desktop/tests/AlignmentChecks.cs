@@ -24,7 +24,7 @@ internal static class AlignmentChecks
                 var table = (DataGrid)window.FindName("AccountList");
                 var rows = Enumerable.Range(0, 4).Select(i => (DataGridRow)table.ItemContainerGenerator.ContainerFromIndex(i)).ToArray();
                 var headers = Children<DataGridColumnHeader>(table).Where(h => h.Column is not null).OrderBy(h => h.Column.DisplayIndex).ToArray();
-                for (int column = 0; column < 3; column++)
+                for (int column = 1; column <= 3; column++)
                 {
                     var positions = rows.Select(row => table.Columns[column].GetCellContent(row).TranslatePoint(new Point(), table).X).ToArray();
                     check(positions.Max() - positions.Min() < 0.5, $"Adjacent rows align in column {column}: {string.Join(",", positions)}");
@@ -33,7 +33,12 @@ internal static class AlignmentChecks
                 }
                 table.SelectedIndex = 1;
                 table.UpdateLayout();
-                check(Math.Abs(table.Columns[0].GetCellContent(rows[0]).TranslatePoint(new Point(), table).X - table.Columns[0].GetCellContent(rows[1]).TranslatePoint(new Point(), table).X) < 0.5, "Selection does not indent rows");
+                check(Math.Abs(table.Columns[1].GetCellContent(rows[0]).TranslatePoint(new Point(), table).X - table.Columns[1].GetCellContent(rows[1]).TranslatePoint(new Point(), table).X) < 0.5, "Selection does not indent rows");
+                var box = Children<CheckBox>(table.Columns[0].GetCellContent(rows[0])).First();
+                box.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                table.UpdateLayout();
+                check(window.ViewModel.CheckedCount == 1 && box.IsChecked == true, "Checkbox selects account without changing list selection");
+                window.ViewModel.ClearChecks();
             }
         }
         finally { window.Close(); }
