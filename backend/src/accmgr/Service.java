@@ -17,6 +17,7 @@ final class Service {
     private DingTalkAuth dingTalk;
 
     void enableDingTalk(DingTalkClient client) { dingTalk = new DingTalkAuth(db, this, client); }
+    String dingCorpId() { return dingTalk == null ? "" : dingTalk.client.corpId; }
 
     static final class Problem extends RuntimeException {
         final int status;
@@ -267,6 +268,9 @@ final class Service {
         String name = optional(body, "name", 120);
         String login = checked(text(body, "login", 1, 160).trim(), 1, 160);
         String notes = optional(body, "notes", 2000);
+        // authenticate holds the owner's row lock until commit, including concurrent creates/updates.
+        if (one(c, "SELECT id FROM am_accounts WHERE platform_id=? AND login=? AND name=? AND id<>?",
+                platformId, login, name, accountId) != null) throw new Problem(409, "duplicate_record");
         String ciphertext = previous;
         if (create || body.has("password"))
             ciphertext = crypto.encrypt(optional(body, "password", 1024), owner + ":" + accountId);

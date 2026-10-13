@@ -13,6 +13,7 @@ public final class DingTalkTest {
     static int checks;
     static Database db;
     static Service service;
+    static String profileName = "张三";
     static final Gson JSON = new Gson();
     static final Map<String, String> codes = new ConcurrentHashMap<>();
     static String code(String dingUser) { String code = Crypto.token(); codes.put(code, dingUser); return code; }
@@ -37,7 +38,7 @@ public final class DingTalkTest {
         Class.forName("org.h2.Driver");
         db = new Database(() -> DriverManager.getConnection("jdbc:h2:mem:ding;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", ""));
         try (Connection c = db.connections.open(); Statement s = c.createStatement()) {
-            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql", "004-sharing-tags.sql", "005-dingtalk.sql"}) {
+            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql", "004-sharing-tags.sql", "005-dingtalk.sql", "006-mobile-search.sql"}) {
                 String ddl = new String(Files.readAllBytes(Paths.get("../database/" + file)), StandardCharsets.UTF_8)
                     .replaceAll("(?m)^--.*$", "").replace("USE `account_management`;", "")
                     .replaceAll(" CHARACTER SET [a-zA-Z0-9_]+", "").replaceAll(" COLLATE[= ]+[a-zA-Z0-9_]+", "")
@@ -50,6 +51,10 @@ public final class DingTalkTest {
         check(!call("GET", "/api/dingtalk/config", null, body()).get("enabled").getAsBoolean(), "Disabled default");
         rejects(503, "dingtalk_disabled", () -> login("ding-owner"));
         service.enableDingTalk(new DingTalkClient("ding-test", "test-app", "test-secret") {
+            @Override String name(String userId) {
+                if (profileName == null) throw new Problem(502, "dingtalk_unavailable");
+                return profileName;
+            }
             @Override String identify(String code) {
                 String identity = codes.remove(code);
                 if (identity == null) throw new Problem(401, "dingtalk_code_invalid");
@@ -69,6 +74,31 @@ public final class DingTalkTest {
         check(call("GET", "/api/me", token, body()).get("id").getAsString().equals(owner), "Bind preserves existing user");
         check(call("GET", "/api/me", token, body()).get("role").getAsString().equals("user"), "No privilege escalation");
         check(call("GET", "/api/dingtalk/binding", token, body()).get("bound").getAsBoolean(), "Binding status");
+        check(call("GET", "/api/dingtalk/binding", token, body()).get("ding_name").getAsString().equals("张三"), "Full DingTalk name is stored");
+        bind("ding-other", "other", "123456");
+        List<?> matches = (List<?>) service.execute("GET", "/api/share-recipients", token, body(), Collections.singletonMap("q", "张"));
+        check(matches.size() == 1 && matches.toString().contains("other"), "Partial name search excludes self and preserves username");
+        bind("ding-admin", "admin", "123456");
+        matches = (List<?>) service.execute("GET", "/api/share-recipients", token, body(), Collections.singletonMap("q", "张"));
+        check(matches.size() == 2 && matches.toString().contains("admin") && matches.toString().contains("other"), "Same names remain separate recipients with usernames");
+        sql("DELETE FROM am_dingtalk_bindings WHERE ding_user_id='ding-admin'");
+        sql("UPDATE am_dingtalk_bindings SET corp_id='different-corp' WHERE user_id=?", other);
+        check(((List<?>) service.execute("GET", "/api/share-recipients", token, body(), Collections.singletonMap("q", "张"))).isEmpty(), "Name search stays in configured enterprise");
+        sql("UPDATE am_dingtalk_bindings SET corp_id='ding-test' WHERE user_id=?", other);
+        check(((List<?>) service.execute("GET", "/api/share-recipients", token, body(), Collections.singletonMap("q", "%"))).isEmpty(), "Search treats wildcard characters literally");
+        sql("UPDATE am_users SET active=0 WHERE id=?", other);
+        check(((List<?>) service.execute("GET", "/api/share-recipients", token, body(), Collections.singletonMap("q", "张"))).isEmpty(), "Name search excludes disabled users");
+        sql("UPDATE am_users SET active=1 WHERE id=?", other);
+        sql("DELETE FROM am_dingtalk_bindings WHERE user_id=?", other);
+        sql("UPDATE am_dingtalk_bindings SET ding_name='' WHERE user_id=?", owner);
+        check(call("GET", "/api/dingtalk/binding", token, body()).get("ding_name").getAsString().equals("张三"), "Old binding name backfilled");
+        profileName = null;
+        check(login("ding-owner").has("token"), "Missing profile permission does not break SSO");
+        check(call("GET", "/api/dingtalk/binding", token, body()).get("ding_name").getAsString().equals("张三"), "Failed profile lookup preserves stored name");
+        profileName = "张三新名";
+        login("ding-owner");
+        check(call("GET", "/api/dingtalk/binding", token, body()).get("ding_name").getAsString().equals("张三新名"), "SSO refreshes changed profile name");
+        profileName = "张三";
         bind("ding-owner", "owner", "123456"); check(count("am_dingtalk_bindings") == 1, "Idempotent same binding");
         rejects(409, "dingtalk_already_bound", () -> bind("ding-owner", "other", "123456"));
         rejects(409, "dingtalk_already_bound", () -> bind("ding-other", "owner", "123456"));

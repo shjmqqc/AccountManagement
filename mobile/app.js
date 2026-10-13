@@ -4,7 +4,7 @@ const API = '/accmgr-api/';
 const $ = id => document.getElementById(id);
 let token = '', user = null, scope = 'own', accounts = [], platforms = [], current = null;
 let busy = false, mustChange = false, secretVersion = 0;
-let dingConfig = null;
+let dingConfig = null, page = 'find';
 const inDingTalk = /DingTalk/i.test(navigator.userAgent);
 let sdkLoading;
 const errors = {
@@ -27,15 +27,18 @@ function element(tag, text, className) {
   const node = document.createElement(tag); if (text != null) node.textContent = text;
   if (className) node.className = className; return node;
 }
-function hideSecret() { secretVersion++; $('secret').textContent = '••••••••'; $('reveal').textContent = '显示密码'; }
+function hideSecret() { secretVersion++; $('copy-fallback').textContent = ''; $('copy-fallback').hidden = true; $('secret').textContent = '••••••••'; $('reveal').textContent = '显示密码'; }
 function show(panel) {
-  hideSecret(); for (const id of ['login-panel', 'password-panel', 'library', 'detail', 'unbind-panel']) $(id).hidden = id !== panel;
-  $('logout').hidden = !token;
+  hideSecret(); for (const id of ['login-panel', 'password-panel', 'library', 'detail', 'unbind-panel', 'share-panel', 'my-panel']) $(id).hidden = id !== panel;
+  $('logout').hidden = !token; $('bottom-nav').hidden = !token || mustChange;
+  $('page-title').textContent = page === 'share' ? '分享管理' : page === 'my' ? '我的' : '帐号管理';
+  for (const button of document.querySelectorAll('[data-page]')) button.setAttribute('aria-pressed', String(button.dataset.page === page));
 }
 function clearSession() {
-  token = ''; user = null; current = null; accounts = []; platforms = []; mustChange = false;
+  token = ''; user = null; current = null; accounts = []; platforms = []; mustChange = false; page = 'find';
+  $('ding-name').textContent = ''; $('binding-status').textContent = '';
   $('accounts').replaceChildren(); $('recipients').replaceChildren(); $('recipient-result').replaceChildren();
-  for (const id of ['detail-title','detail-platform','account-login','account-url','account-notes','identity']) $(id).textContent = '';
+  for (const id of ['detail-title','detail-platform','share-title','account-login','account-url','account-notes','identity']) $(id).textContent = '';
   $('detail-tags').replaceChildren();
   $('login-form').reset(); $('password-form').reset(); $('recipient-form').reset();
   $('unbind-form').reset(); $('unbind-dingtalk').hidden = true;
@@ -93,20 +96,34 @@ async function loadLibrary() {
     for (const tag of a.tags || []) tagNames.set(tag.id, tag.name + (received ? ' · ' + a.owner_username : ''));
   }
   options('platform-filter', '全部平台', platformNames); options('tag-filter', '全部标签', tagNames);
+  $('scope-tabs').hidden = page === 'share';
   show('library'); renderAccounts();
 }
 function renderAccounts() {
+  hideSecret();
   const q = $('search').value.trim().toLocaleLowerCase(), platform = $('platform-filter').value, tag = $('tag-filter').value;
   const filtered = accounts.filter(a => (q ? [a.platform_name,a.name,a.login,a.notes].some(s => (s || '').toLocaleLowerCase().includes(q)) : !platform || a.platform_id === platform)
     && (!tag || (a.tags || []).some(t => t.id === tag)));
   $('accounts').replaceChildren(); $('count').textContent = filtered.length ? `${filtered.length} 个帐号` : '暂无符合条件的帐号';
   for (const a of filtered) {
-    const card = element('button', null, 'card'); card.append(element('strong', a.name || a.login));
-    card.append(element('span', `${a.platform_name} · ${a.login}`, 'muted'));
-    if (scope === 'received') card.append(element('span', '分享人：' + a.owner_username, 'muted'));
-    if (scope === 'outgoing') card.append(element('span', `已分享给 ${a.share_count} 人`, 'muted'));
-    const badges = element('div'); tags(badges, a.tags); card.append(badges);
-    card.onclick = () => run(() => openAccount(a)); $('accounts').append(card);
+    const card = element('div', null, 'card'), open = element('button', null, 'account-main');
+    open.append(element('strong', a.name || a.login));
+    open.append(element('span', `${a.platform_name} · ${a.login}`, 'muted'));
+    if (scope === 'received') open.append(element('span', '来自 ' + a.owner_username, 'muted small'));
+    if (scope === 'outgoing') open.append(element('span', `已分享给 ${a.share_count} 人`, 'muted small'));
+    const badges = element('div'); tags(badges, (a.tags || []).slice(0, 2));
+    if ((a.tags || []).length > 2) badges.append(element('span', '+' + (a.tags.length - 2), 'tag gray'));
+    open.append(badges); open.onclick = () => run(() => openAccount(a));
+    const quick = element('button', scope === 'outgoing' ? '管理' : '复制密码', 'quick');
+    quick.setAttribute('aria-label', (scope === 'outgoing' ? '管理分享：' : '复制密码：') + (a.name || a.login));
+    quick.onclick = () => run(async () => {
+      if (scope === 'outgoing') { await openAccount(a); await openSharing(); return; }
+      hideSecret(); const version = secretVersion, selectedScope = scope;
+      const data = await api(`api/${selectedScope === 'received' ? 'shared/' : ''}accounts/${encodeURIComponent(a.id)}/password`, 'POST', {action: 'copy'});
+      if (version !== secretVersion || document.hidden || scope !== selectedScope) return;
+      await copy(data.password, $('copy-fallback'));
+    });
+    card.append(open, quick); $('accounts').append(card);
   }
 }
 async function openAccount(listItem) {
@@ -118,8 +135,13 @@ async function openAccount(listItem) {
   $('account-login').textContent = current.login; $('account-notes').textContent = current.notes || '暂无备注'; tags($('detail-tags'), current.tags);
   const url = scope === 'received' ? current.platform_url : platforms.find(p => p.id === current.platform_id)?.url;
   $('account-url').textContent = url || '未填写';
-  $('sharing').hidden = scope === 'received'; $('recipient-result').replaceChildren(); $('recipient-form').reset();
-  if (scope !== 'received') await loadRecipients();
+  $('open-sharing').hidden = scope === 'received'; $('recipient-result').replaceChildren(); $('recipient-form').reset();
+  current.platform_url = url || '';
+}
+async function openSharing() {
+  if (!current || scope === 'received') return;
+  show('share-panel'); $('share-title').textContent = current.name || current.login;
+  await loadRecipients();
 }
 async function loadRecipients() {
   const recipients = await api('api/accounts/' + encodeURIComponent(current.id) + '/shares');
@@ -127,9 +149,9 @@ async function loadRecipients() {
   if (!recipients.length) $('recipients').append(element('p', '尚未分享给其他人', 'muted'));
   for (const recipient of recipients) {
     const row = element('div', null, 'recipient'), button = element('button', '撤销');
-    row.append(element('span', recipient.username + (recipient.active === 0 ? '（已停用）' : '')), button);
+    row.append(element('span', recipientLabel(recipient) + (recipient.active === 0 ? '（已停用）' : '')), button);
     button.onclick = () => run(async () => {
-      if (!confirm(`撤销对 ${recipient.username} 的分享？已复制的内容无法收回。`)) return;
+      if (!confirm(`撤销对 ${recipientLabel(recipient)} 的分享？已复制的内容无法收回。`)) return;
       await api(`api/accounts/${encodeURIComponent(current.id)}/shares/${encodeURIComponent(recipient.id)}`, 'DELETE');
       await loadRecipients(); message('已撤销分享。');
     });
@@ -137,12 +159,48 @@ async function loadRecipients() {
   }
 }
 async function copy(text, target) {
+  const version = secretVersion;
+  const active = () => version === secretVersion && !document.hidden;
+  if (!active()) return;
+  if (inDingTalk) {
+    try {
+      await loadDingSdk();
+      if (!active()) return;
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('clipboard timeout')), 5000);
+        const success = () => { clearTimeout(timer); resolve(); };
+        const fail = () => { clearTimeout(timer); reject(new Error('clipboard unavailable')); };
+        if (typeof window.dd?.setClipboard !== 'function') { fail(); return; }
+        try {
+          const pending = window.dd.setClipboard({text, success, fail});
+          if (pending?.then) pending.then(success, fail);
+        } catch (_) { fail(); }
+      });
+      if (active()) message('已复制。');
+      return;
+    } catch (_) { /* Try browser capabilities when the native bridge is unavailable. */ }
+  }
+  if (!active()) return;
   try {
     if (!navigator.clipboard?.writeText) throw new Error('unavailable');
-    await navigator.clipboard.writeText(text); message('已复制。');
+    await navigator.clipboard.writeText(text);
+    if (active()) message('已复制。');
+    return;
   } catch (_) {
-    if (document.hidden) return;
-    target.textContent = text;
+    if (!active()) return;
+    // HTTP WebViews may support the selection-based copy command even without Clipboard API.
+    const input = element('textarea'), focused = document.activeElement;
+    let copied = false;
+    input.className = 'clipboard-input'; input.value = text; input.readOnly = true;
+    try {
+      document.body.append(input); input.focus(); input.select(); input.setSelectionRange(0, text.length);
+      copied = document.execCommand('copy') === true;
+    } catch (_) { /* Manual selection remains available below. */ }
+    finally { input.value = ''; input.remove(); if (focused?.isConnected) focused.focus({preventScroll: true}); }
+    if (!active()) return;
+    if (copied) { message('已复制。'); return; }
+    target.hidden = false; target.textContent = text;
+    target.scrollIntoView({block: 'nearest'});
     const selection = window.getSelection(), range = document.createRange(); range.selectNodeContents(target);
     selection.removeAllRanges(); selection.addRange(range); message('当前环境不支持直接复制，已选中文本，请长按复制。');
   }
@@ -162,16 +220,42 @@ async function acceptLogin(result) {
   if (mustChange) { show('password-panel'); $('cancel-password').hidden = true; return; }
   user = await api('api/me'); $('identity').textContent = user.username;
   try { sessionStorage.setItem('accmgr.session', JSON.stringify({token, expires: result.expires_at})); } catch (_) { }
-  scope = 'own'; updateTabs(); await loadLibrary();
-  await loadBindingStatus();
+  page = 'find'; scope = 'own'; updateTabs(); await loadLibrary();
 }
 async function loadBindingStatus() {
   $('unbind-dingtalk').hidden = true;
-  if (dingConfig?.enabled) $('unbind-dingtalk').hidden = !(await api('api/dingtalk/binding')).bound;
+  $('binding-status').textContent = dingConfig?.enabled ? '未绑定' : '钉钉免登未启用';
+  $('ding-name').textContent = '未绑定'; $('refresh-binding').hidden = !dingConfig?.enabled;
+  if (dingConfig?.enabled) {
+    const binding = await api('api/dingtalk/binding');
+    $('unbind-dingtalk').hidden = !binding.bound;
+    $('binding-status').textContent = binding.bound ? '已绑定' : '未绑定';
+    $('ding-name').textContent = binding.bound ? binding.ding_name || '姓名暂未同步，请刷新或联系管理员检查钉钉通讯录权限。' : '未绑定';
+  }
 }
+function recipientLabel(recipient) { return recipient.ding_name ? `${recipient.ding_name}（${recipient.username}）` : recipient.username; }
+async function navigate(destination) {
+  page = destination; hideSecret(); message();
+  if (page === 'my') { current = null; show('my-panel'); await loadBindingStatus(); return; }
+  scope = page === 'share' ? 'outgoing' : 'own';
+  $('search').value = ''; $('platform-filter').value = ''; $('tag-filter').value = '';
+  updateTabs(); await loadLibrary();
+}
+for (const button of document.querySelectorAll('[data-page]')) button.onclick = () => run(() => navigate(button.dataset.page));
+$('refresh-binding').onclick = () => run(loadBindingStatus);
+$('open-sharing').onclick = () => run(openSharing);
+$('share-back').onclick = () => run(() => openAccount(current));
+$('copy-all').onclick = () => run(async () => {
+  if (!current) return;
+  hideSecret(); const version = secretVersion, record = current;
+  const data = await api(`api/${scope === 'received' ? 'shared/' : ''}accounts/${encodeURIComponent(record.id)}/password`, 'POST', {action: 'copy'});
+  if (version !== secretVersion || document.hidden || current?.id !== record.id) return;
+  await copy(`【平台名称】${record.platform_name || ''}\n【地址】${record.platform_url || ''}\n【帐号】${record.login}\n【密码】${data.password}`, $('copy-fallback'));
+});
+
 function suppressAutoLogin() { try { sessionStorage.setItem('accmgr.manualLogout', '1'); } catch (_) { } }
-function dingCode() {
-  if (!inDingTalk || !dingConfig?.enabled) return Promise.reject(new Error('请从钉钉工作台进入此应用。'));
+function loadDingSdk() {
+  if (window.dd) return Promise.resolve();
   if (!sdkLoading) sdkLoading = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const timer = setTimeout(() => reject(new Error('钉钉组件加载超时，可使用帐号密码登录。')), 10000);
@@ -180,7 +264,11 @@ function dingCode() {
     script.onerror = () => { clearTimeout(timer); reject(new Error('钉钉组件加载失败，可使用帐号密码登录。')); };
     document.head.append(script);
   }).catch(error => { sdkLoading = null; throw error; });
-  return sdkLoading.then(() => new Promise((resolve, reject) => {
+  return sdkLoading;
+}
+function dingCode() {
+  if (!inDingTalk || !dingConfig?.enabled) return Promise.reject(new Error('请从钉钉工作台进入此应用。'));
+  return loadDingSdk().then(() => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('获取钉钉身份超时，请重试或使用帐号密码登录。')), 10000);
     const success = result => { clearTimeout(timer); result?.code ? resolve(result.code) : reject(new Error('未获取到钉钉授权码。')); };
     const fail = () => { clearTimeout(timer); reject(new Error('无法获取钉钉身份，请检查应用配置或使用帐号密码登录。')); };
@@ -206,7 +294,7 @@ $('login-form').onsubmit = event => { event.preventDefault(); run(async () => {
 }); };
 $('logout').onclick = () => run(async () => { suppressAutoLogin(); try { await api('api/logout', 'POST'); } finally { clearSession(); } });
 $('unbind-dingtalk').onclick = () => { $('unbind-form').reset(); show('unbind-panel'); };
-$('cancel-unbind').onclick = () => { $('unbind-form').reset(); show('library'); };
+$('cancel-unbind').onclick = () => { $('unbind-form').reset(); show('my-panel'); };
 $('unbind-form').onsubmit = event => { event.preventDefault(); run(async () => {
   const password = $('unbind-password').value; $('unbind-password').value = '';
   await api('api/dingtalk/binding', 'DELETE', {password}); suppressAutoLogin(); clearSession(); message('已解除钉钉绑定，请重新登录。');
@@ -222,18 +310,18 @@ $('reveal').onclick = () => run(() => password(false)); $('copy-password').oncli
 $('copy-login').onclick = () => run(() => copy(current.login, $('account-login')));
 $('recipient-form').onsubmit = event => { event.preventDefault(); run(async () => {
   $('recipient-result').replaceChildren(); const matches = await api('api/share-recipients?q=' + encodeURIComponent($('recipient-name').value.trim()));
-  if (!matches.length) { message('未找到可分享的用户，请输入完整用户名。'); return; }
+  if (!matches.length) { message('未找到可分享的用户，请输入钉钉姓名片段或完整用户名。'); return; }
   for (const recipient of matches) {
-    const button = element('button', '分享给 ' + recipient.username, 'full');
+    const button = element('button', '分享给 ' + recipientLabel(recipient), 'full');
     button.onclick = () => run(async () => {
-      if (!confirm(`将此帐号分享给 ${recipient.username}？对方可查看和复制密码。`)) return;
+      if (!confirm(`将此帐号分享给 ${recipientLabel(recipient)}？对方可查看和复制密码。`)) return;
       await api('api/accounts/' + encodeURIComponent(current.id) + '/shares', 'POST', {recipient_id: recipient.id});
       $('recipient-result').replaceChildren(); await loadRecipients(); message('分享成功。');
     }); $('recipient-result').append(button);
   }
 }); };
 $('change-password').onclick = () => { $('password-form').reset(); $('cancel-password').hidden = false; show('password-panel'); };
-$('cancel-password').onclick = () => { $('password-form').reset(); show('library'); };
+$('cancel-password').onclick = () => { $('password-form').reset(); show('my-panel'); };
 $('password-form').onsubmit = event => { event.preventDefault(); run(async () => {
   const old_password = $('old-password').value, new_password = $('new-password').value;
   if ([...new_password].length < 6) throw new Error('新密码至少 6 位。');
@@ -255,5 +343,5 @@ run(async () => {
   if (inDingTalk && dingConfig?.enabled) { clearSession(); await dingLogin(); return; }
   let saved; try { saved = JSON.parse(sessionStorage.getItem('accmgr.session')); } catch (_) { }
   if (!saved || typeof saved.token !== 'string' || typeof saved.expires !== 'number' || saved.expires <= Date.now()) { clearSession(); return; }
-  token = saved.token; user = await api('api/me'); $('identity').textContent = user.username; await loadLibrary(); await loadBindingStatus();
+  token = saved.token; user = await api('api/me'); $('identity').textContent = user.username; await loadLibrary();
 });

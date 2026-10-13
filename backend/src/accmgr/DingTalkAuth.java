@@ -43,6 +43,7 @@ final class DingTalkAuth {
                         audit(c, owner, "dingtalk_bind");
                     }
                 }
+                syncName(c, owner, dingUser);
                 Object result = service.newSession(c, user); c.commit(); return result;
             } catch (Exception e) { c.rollback(); throw e; }
         } catch (SQLException e) {
@@ -54,13 +55,28 @@ final class DingTalkAuth {
 
     Object binding(Connection c, Map<String, Object> user, String method, JsonObject body) throws Exception {
         String owner = (String) user.get("id");
-        if (method.equals("GET")) return object("bound", one(c, "SELECT user_id FROM am_dingtalk_bindings WHERE corp_id=? AND user_id=?", client.corpId, owner) != null);
+        if (method.equals("GET")) {
+            Map<String, Object> binding = one(c, "SELECT ding_user_id,ding_name FROM am_dingtalk_bindings WHERE corp_id=? AND user_id=?", client.corpId, owner);
+            if (binding == null) return object("bound", false, "ding_name", "");
+            String name = (String) binding.get("ding_name");
+            if (name.isEmpty()) name = syncName(c, owner, (String) binding.get("ding_user_id"));
+            return object("bound", true, "ding_name", name);
+        }
         if (!method.equals("DELETE")) throw new Problem(405, "method_not_allowed");
         service.verifyLoginPassword(c, user, text(body, "password", 1, 256));
         update(c, "DELETE FROM am_dingtalk_bindings WHERE corp_id=? AND user_id=?", client.corpId, owner);
         update(c, "DELETE FROM am_sessions WHERE user_id=?", owner);
         audit(c, owner, "dingtalk_unbind");
         return object("ok", true, "login_required", true);
+    }
+
+    private String syncName(Connection c, String owner, String dingUser) throws Exception {
+        String name;
+        try { name = client.name(dingUser); }
+        catch (Exception unavailable) { return ""; } // Optional profile lookup must not prevent login.
+        update(c, "UPDATE am_dingtalk_bindings SET ding_name=? WHERE corp_id=? AND user_id=? AND ding_user_id=?",
+                name, client.corpId, owner, dingUser);
+        return name;
     }
 
     private void audit(Connection c, String owner, String action) throws Exception {

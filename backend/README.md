@@ -10,7 +10,7 @@
 
 另已实现单帐号多接收人只读分享、手动撤销、自定义彩色标签及筛选，Windows 已接入。接收人通过专用接口读取已授权的帐号和密码。
 
-**已安装管理功能的服务器请按 [SHARING-UPGRADE.md](SHARING-UPGRADE.md) 升级，只执行 004 增量建表并更新 JAR，不重跑以下首次部署流程。** 尚未安装 003 时先参考 [UPGRADE.md](UPGRADE.md)。
+**已有部署请按 [MOBILE-SEARCH-UPGRADE.md](MOBILE-SEARCH-UPGRADE.md) 升级至 006，保留原配置和密钥，不重跑以下首次部署流程。** 缺少 003/004/005 时先依次完成对应历史迁移。
 
 HTTP 监听地址由 `config.properties` 的 `http.host` 指定，示例配置为 `0.0.0.0`，端口由 `http.port` 指定（默认 18082）。旧配置未填写 http.host 时仍监听 127.0.0.1。后端不强制 HTTPS，后续由 Nginx 终止 TLS 并反向代理到此 HTTP 服务。
 
@@ -63,6 +63,8 @@ backend/
   002-core-schema.sql
   003-admin-schema.sql
   004-sharing-tags.sql
+  005-dingtalk.sql
+  006-mobile-search.sql
 ```
 
 1. 管理员运行建表脚本：
@@ -71,9 +73,11 @@ backend/
 mysql -u root -p < 002-core-schema.sql
 mysql -u root -p < 003-admin-schema.sql
 mysql -u root -p < 004-sharing-tags.sql
+mysql -u root -p < 005-dingtalk.sql
+mysql -u root -p < 006-mobile-search.sql
 ```
 
-仅在已确认的新库 account_management 执行，不添加 `--force`。002 建四张核心表，003 建两张管理表，004 建三张分享/标签表，不删表、不修改旧业务库。每条命令成功后才执行下一条；MySQL 5.5 DDL 非事务性，任何失败都应先检查报错，不能直接反复执行或删表。
+仅在已确认的新库 account_management 执行，不添加 `--force`。002 建四张核心表，003 建两张管理表，004 建三张分享/标签表，005 建钉钉绑定表，006 加姓名并调整帐号判重索引，不删表、不修改旧业务库。每条命令成功后才执行下一条；MySQL 5.5 DDL 非事务性，任何失败都应先检查报错，不能直接反复执行或删表。
 
 2. 创建独立应用用户；下列密码占位必须自行替换为独立随机字母数字密码。不要使用 root、旧服务或 am_probe 帐号运行后端。
 

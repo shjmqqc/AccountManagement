@@ -23,6 +23,8 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 | DELETE | /api/accounts/{id} | 删除本人帐号；界面须先确认 |
 | POST | /api/accounts/{id}/password | 返回 password，供显示/复制 |
 
+帐号新增/修改：同平台、同登录帐号、同帐号名称才返回 409 `duplicate_record`，不同名称允许使用相同登录帐号。后端持有所有者行锁后判重并写入；不支持绕过 API 直接写表。
+
 有非空 q 时忽略 platform_id，搜索平台名称、帐号名称、登录帐号、备注，按字面包含匹配；不搜索密码。该阶段按每人约 100 条规模返回全部匹配结果，不提供分页。
 
 错误状态：400 输入无效，401 登录无效/过期，403 必须改密或浏览器来源不允许，404 不存在或不属于本人，405 方法不支持，409 重复记录/非空平台，413 请求体过大，415 非 JSON 请求体，429 登录频率过高，500 服务端异常。
@@ -82,13 +84,13 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 
 ## 钉钉企业内部身份绑定与免登
 
-仅配置启用后使用，先执行 005。`GET /api/dingtalk/config` 无需登录，仅返回 enabled、corp_id、client_id，绝不返回 AppSecret。
+仅配置启用后使用；本版数据库需执行至 006。`GET /api/dingtalk/config` 无需登录，仅返回 enabled、corp_id、client_id，绝不返回 AppSecret。
 
 | 方法 | 路径 | 请求与行为 |
 |---|---|---|
 | POST | /api/dingtalk/login | 无需 Bearer；code 由钉钉 JSAPI 获取，后端换取身份；未绑定返回 bound=false，已绑定返回标准登录会话 |
 | POST | /api/dingtalk/bind | 无需 Bearer；code、username、password，验证系统密码后绑定并返回会话；不会创建系统帐号 |
-| GET | /api/dingtalk/binding | 需 Bearer；返回当前系统帐号在配置企业中的 bound 状态 |
+| GET | /api/dingtalk/binding | 需 Bearer；返回当前系统帐号在配置企业中的 bound 状态及 ding_name（未绑定/未同步为空字符串）；历史空姓名尝试补齐 |
 | DELETE | /api/dingtalk/binding | 需 Bearer；password 再验证，解绑并撤销该帐号所有会话 |
 
 公开登录/绑定及解绑共用登录限流，密码校验共用失败锁定。停用或锁定拒绝免登；强制改密返回 403 dingtalk_password_required，需走原密码登录和改密。绑定冲突返回 409 dingtalk_already_bound；上游不可用返回 502 dingtalk_unavailable；功能关闭返回 503 dingtalk_disabled。前端不得提交可信 userid 或任意企业配置。详细部署见 DINGTALK-UPGRADE.md。
@@ -99,7 +101,7 @@ JSON 使用 UTF-8。除 POST /api/login、POST /api/register 和 GET /health 外
 
 | 方法 | 路径 | 请求 / 返回 |
 |---|---|---|
-| GET | /api/share-recipients?q=完整用户名 | 精确查找已启用且非本人的用户；返回 id、username 数组；空查询返回 400 |
+| GET | /api/share-recipients?q=用户名或姓名 | 完整用户名精确匹配或配置企业的钉钉姓名片段匹配；仅启用且非本人，返回 id、username、ding_name 数组；空查询返回 400 |
 | GET | /api/accounts/{id}/shares | 仅所有者可列出接收人：id、username、active、created_at |
 | POST | /api/accounts/{id}/shares | `{ "recipient_id": "用户UUID" }`；添加只读授权，重复授权不重复创建 |
 | DELETE | /api/accounts/{id}/shares/{recipientId} | 仅所有者可撤销；重复撤销成功 |

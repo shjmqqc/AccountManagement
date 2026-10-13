@@ -57,6 +57,8 @@ java -Xms16m -Xmx64m -cp 'database-probe.jar:mysql-connector-java-5.1.49.jar' Da
 
 ## 驱动与构建
 
+当前版本安装须在 004 后继续执行 `005-dingtalk.sql` 和 `006-mobile-search.sql`，包括未启用钉钉免登的部署。006 添加绑定姓名，并将帐号判重改为同平台、同登录帐号、同名称；兼容 MySQL 5.5 的判重事务与升级步骤见 [H5 查找与分享升级](../backend/MOBILE-SEARCH-UPGRADE.md)。已有部署只执行缺少的迁移，不重复建表。
+
 探针暂使用 Connector/J 5.1.49 适配旧 MySQL；该系列已结束常规维护，仅作为现有旧环境的兼容性选择，不是推荐给新环境的默认版本。
 
 - 官方兼容性文档：https://downloads.mysql.com/docs/connector-j-5.1-en.pdf

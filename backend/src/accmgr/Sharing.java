@@ -14,8 +14,10 @@ final class Sharing {
         requireMethod(method, "GET");
         String name = query.getOrDefault("q", "").trim();
         if (name.isEmpty() || name.codePointCount(0, name.length()) > 100) throw new Problem(400, "recipient_username_required");
-        // Exact match, not a general directory. Only names and identifiers needed for granting are returned.
-        return rows(c, "SELECT id,username FROM am_users WHERE username=? AND active=1 AND id<>?", name, actor);
+        return rows(c, "SELECT u.id,u.username,COALESCE(b.ding_name,'') AS ding_name FROM am_users u "
+                + "LEFT JOIN am_dingtalk_bindings b ON b.user_id=u.id AND b.corp_id=? "
+                + "WHERE u.active=1 AND u.id<>? AND (u.username=? OR LOCATE(?,b.ding_name)>0) "
+                + "ORDER BY u.username,u.id", service.dingCorpId(), actor, name, name);
     }
 
     Object grants(Connection c, String actor, String accountId, String recipientId, String method, JsonObject body) throws Exception {
@@ -23,8 +25,9 @@ final class Sharing {
         Map<String, Object> account = one(c, "SELECT id FROM am_accounts WHERE id=? AND owner_id=? FOR UPDATE", accountId, actor);
         if (account == null) throw new Problem(404, "not_found");
         if (recipientId == null && method.equals("GET")) return rows(c,
-                "SELECT u.id,u.username,u.active,s.created_at FROM am_account_shares s JOIN am_users u ON u.id=s.recipient_id "
-                + "WHERE s.account_id=? ORDER BY s.created_at,u.id", accountId);
+                "SELECT u.id,u.username,u.active,s.created_at,COALESCE(b.ding_name,'') AS ding_name FROM am_account_shares s JOIN am_users u ON u.id=s.recipient_id "
+                + "LEFT JOIN am_dingtalk_bindings b ON b.user_id=u.id AND b.corp_id=? "
+                + "WHERE s.account_id=? ORDER BY s.created_at,u.id", service.dingCorpId(), accountId);
         String target = recipientId == null ? id(text(body, "recipient_id", 36, 36)) : recipientId;
         requireMethod(method, recipientId == null ? "POST" : "DELETE");
         String action = recipientId == null ? "share_grant" : "share_revoke";

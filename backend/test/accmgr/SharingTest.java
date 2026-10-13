@@ -19,7 +19,7 @@ public final class SharingTest {
         Class.forName("org.h2.Driver");
         db = new Database(() -> DriverManager.getConnection("jdbc:h2:mem:sharing;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", ""));
         try (Connection c = db.connections.open(); Statement s = c.createStatement()) {
-            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql", "004-sharing-tags.sql"}) {
+            for (String file : new String[]{"002-core-schema.sql", "003-admin-schema.sql", "004-sharing-tags.sql", "005-dingtalk.sql", "006-mobile-search.sql"}) {
                 String ddl = new String(Files.readAllBytes(Paths.get("../database/" + file)), StandardCharsets.UTF_8)
                         .replaceAll("(?m)^--.*$", "").replace("USE `account_management`;", "")
                         .replaceAll(" CHARACTER SET [a-zA-Z0-9_]+", "").replaceAll(" COLLATE[= ]+[a-zA-Z0-9_]+", "")
@@ -46,7 +46,7 @@ public final class SharingTest {
         request("GET", "/api/share-recipients", owner, null, 400);
         check(get("/api/share-recipients?q=rec", owner).getAsJsonArray().size() == 0, "Recipient lookup is exact, not enumeration");
         JsonArray match = get("/api/share-recipients?q=recipient", owner).getAsJsonArray();
-        check(match.size() == 1 && match.get(0).getAsJsonObject().size() == 2, "Lookup returns only id and username");
+        check(match.size() == 1 && match.get(0).getAsJsonObject().size() == 3 && match.get(0).getAsJsonObject().get("ding_name").getAsString().isEmpty(), "Lookup returns only id, username and optional DingTalk name");
         check(get("/api/share-recipients?q=owner", owner).getAsJsonArray().size() == 0, "Self not returned");
         String tag = str(post("/api/tags", owner, body("name", "测试帐号🔐", "color", "orange")), "id");
         JsonElement reused = post("/api/tags", owner, body("name", "测试帐号🔐", "color", "red"));

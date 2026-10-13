@@ -32,6 +32,20 @@ class DingTalkClient {
         return id;
     }
 
+    String name(String userId) throws Exception {
+        JsonObject response = request("https://oapi.dingtalk.com/topapi/v2/user/get?access_token="
+                + encode(accessToken()), Service.object("userid", userId));
+        if (!response.has("errcode") || response.get("errcode").getAsInt() != 0)
+            throw new Service.Problem(502, "dingtalk_unavailable");
+        JsonObject result = response.getAsJsonObject("result");
+        if (result == null || !result.has("name") || !result.get("name").isJsonPrimitive())
+            throw new Service.Problem(502, "dingtalk_unavailable");
+        String name = result.get("name").getAsString().trim();
+        if (name.isEmpty() || name.codePointCount(0, name.length()) > 100)
+            throw new Service.Problem(502, "dingtalk_unavailable");
+        return name;
+    }
+
     private synchronized String accessToken() throws Exception {
         if (accessToken != null && System.currentTimeMillis() < expiresAt) return accessToken;
         JsonObject response = request("https://oapi.dingtalk.com/gettoken?appkey=" + encode(clientId) + "&appsecret=" + encode(secret), null);

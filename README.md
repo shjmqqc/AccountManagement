@@ -38,7 +38,7 @@
 | 用户管理 | 停用、恢复、重置临时密码；重置后强制改密并撤销旧会话 |
 | 管理员查看 | 他人帐号库只读查看；不能修改或删除他人的平台与帐号 |
 | 审计 | 记录管理操作、分享授权/撤销，以及管理员和接收人显示/复制密码；后端支持审计查询 |
-| 钉钉 H5 | 三个帐号入口、搜索及平台/标签筛选、查看/复制密码、分享管理、修改登录密码 |
+| 钉钉 H5 | 紧凑“找帐号／分享／我的”页面、搜索与折叠筛选、四行整体复制、钉钉姓名展示/搜索、分享管理 |
 | 钉钉免登 | 首次密码验证绑定；之后钉钉身份登录；支持密码回退和解绑，遵循停用、锁定及强制改密规则 |
 | 网络 | 可配置 HTTP 监听地址；支持 HTTP / HTTPS；Apache 或 Nginx 反向代理；H5 同域 API 与精确来源校验 |
 | Windows 更新 | Velopack 安装包；启动检查、下载及确认重启；自托管更新源，发布签名和安装包哈希验证 |
@@ -126,12 +126,12 @@ $dotnet = (Get-Command dotnet).Source
 首次部署请按 [后端部署说明](backend/README.md) 操作，流程为：
 
 1. 使用 [001-create-database.sql](database/001-create-database.sql) 创建独立数据库。
-2. 依次执行 [002-core-schema.sql](database/002-core-schema.sql)、[003-admin-schema.sql](database/003-admin-schema.sql)、[004-sharing-tags.sql](database/004-sharing-tags.sql)，创建核心、管理、分享及标签表。
+2. 依次执行 [002](database/002-core-schema.sql)、[003](database/003-admin-schema.sql)、[004](database/004-sharing-tags.sql)、[005](database/005-dingtalk.sql)、[006](database/006-mobile-search.sql)，创建数据表并应用姓名与帐号判重规则。
 3. 创建专用数据库用户，复制配置示例并填写数据库密码、密钥路径和监听地址。
 4. 生成一次加密密钥，初始化首位管理员，再启动后端。
 5. 在客户端填写服务地址，使用初始化的管理员帐号登录并邀请同事。
 
-**已有部署不要重跑建库、建表或密钥生成命令。** 按当前已部署功能执行缺少的增量脚本：[管理功能 003](backend/UPGRADE.md)、[分享与标签 004](backend/SHARING-UPGRADE.md)。启用钉钉免登还需执行 [005-dingtalk.sql](database/005-dingtalk.sql)，更新后端并填写钉钉配置，见[钉钉免登升级说明](backend/DINGTALK-UPGRADE.md)。已执行的脚本不重复执行。数据库备份与原密钥都应妥善保留，否则可能无法解密已有密码。
+**已有部署不要重跑建库、建表或密钥生成命令。** 按当前已部署功能执行缺少的增量脚本：[管理功能 003](backend/UPGRADE.md)、[分享与标签 004](backend/SHARING-UPGRADE.md)、[钉钉绑定表 005](database/005-dingtalk.sql)。启用免登的配置见[钉钉免登升级说明](backend/DINGTALK-UPGRADE.md)。本版还须执行 [006 迁移并更新后端/H5](backend/MOBILE-SEARCH-UPGRADE.md)，包含钉钉姓名及同平台同登录帐号按不同名称保存的规则。已执行的脚本不重复执行。数据库备份与原密钥都应妥善保留，否则可能无法解密已有密码。
 
 现有 `config.properties` 的监听配置：
 

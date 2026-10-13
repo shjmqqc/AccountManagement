@@ -146,7 +146,7 @@ public sealed class ApiClient : IDisposable
         "admin_required" => "此功能仅限管理员使用。",
         "admin_account_protected" => "不能停用或重置管理员帐号，请使用本人修改密码功能。",
         "new_password_must_differ" => "新密码不能与临时密码相同。",
-        "duplicate_record" => "已存在相同的平台名称，或该平台下已有此登录帐号。",
+        "duplicate_record" => "已存在相同的平台名称，或该平台下已有相同名称和登录帐号的记录。",
         "platform_not_empty" => "平台内还有帐号，请先删除其中的帐号。",
         "not_found" => "记录不存在或无权访问，请刷新后重试。",
         "invalid_url" => "平台网址须为完整的 http:// 或 https:// 地址。",

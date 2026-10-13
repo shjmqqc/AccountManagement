@@ -12,7 +12,9 @@ public final class Fixture {
         Database db = new Database(() -> DriverManager.getConnection("jdbc:h2:mem:desktop;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1", "sa", ""));
         String ddl = (new String(Files.readAllBytes(Paths.get("../database/002-core-schema.sql")), StandardCharsets.UTF_8)
             + new String(Files.readAllBytes(Paths.get("../database/003-admin-schema.sql")), StandardCharsets.UTF_8)
-            + new String(Files.readAllBytes(Paths.get("../database/004-sharing-tags.sql")), StandardCharsets.UTF_8))
+            + new String(Files.readAllBytes(Paths.get("../database/004-sharing-tags.sql")), StandardCharsets.UTF_8)
+                + new String(Files.readAllBytes(Paths.get("../database/005-dingtalk.sql")), StandardCharsets.UTF_8)
+                + new String(Files.readAllBytes(Paths.get("../database/006-mobile-search.sql")), StandardCharsets.UTF_8))
             .replaceAll("(?m)^--.*$", "").replace("USE `account_management`;", "")
             .replaceAll(" CHARACTER SET [a-zA-Z0-9_]+", "").replaceAll(" COLLATE[= ]+[a-zA-Z0-9_]+", "")
             .replaceAll(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "");
@@ -24,6 +26,16 @@ public final class Fixture {
         try (Connection c = db.connections.open()) {
             Database.update(c, "INSERT INTO am_users(id,username,password_hash,role,created_at) VALUES(?,?,?,?,?)",
                 UUID.randomUUID().toString(), "other-test", Crypto.hashPassword("test123456"), "user", System.currentTimeMillis());
+        }
+        if (args.length > 2 && args[2].equals("ding")) {
+            service.enableDingTalk(new DingTalkClient("fixture-corp", "fixture-app", "fixture-secret") {
+                @Override String name(String userId) { return "张三"; }
+            });
+            try (Connection c = db.connections.open()) {
+                for (java.util.Map<String, Object> user : Database.rows(c, "SELECT id,username FROM am_users"))
+                    Database.update(c, "INSERT INTO am_dingtalk_bindings(corp_id,ding_user_id,user_id,created_at,ding_name) VALUES(?,?,?,?,?)",
+                            "fixture-corp", user.get("username"), user.get("id"), 1, "张三");
+            }
         }
         ApiServer server = new ApiServer(service, "127.0.0.1", Integer.parseInt(args[0]), args.length > 1 ? args[1] : "");
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));

@@ -5,9 +5,10 @@
 ## 功能范围
 
 - 首次密码验证绑定钉钉身份、之后免登、密码登录回退、密码确认解绑；退出后暂停当前页面会话的自动登录。
-- 我的帐号、分享给我、分享给别人；关键词搜索、平台及标签筛选。
-- 查看详情、显示或复制帐号密码；切到后台、返回列表时隐藏密码。
-- 按完整用户名查找接收人，确认分享，查看已有接收人及撤销。
+- 底部“找帐号／分享／我的”导航；紧凑列表，自己的／收到的帐号范围切换，平台及标签筛选默认收起。
+- 列表直接复制密码；详情显示/复制帐号密码及整体复制（平台名称、地址、帐号、密码各一行）；切到后台或离开页面清除页面密码文本。
+- 按完整用户名或钉钉姓名片段查找接收人，展示姓名及用户名；独立分享页面确认授权、查看接收人及撤销。
+- “我的”展示绑定状态、完整钉钉姓名；历史空姓名自动补齐，未同步时提示刷新。
 - 修改登录密码、强制修改临时密码、退出和会话失效处理。
 - 第一版暂不含帐号/平台编辑、邀请注册、管理员操作或批量分享。
 
@@ -15,7 +16,7 @@
 
 ## 服务器部署
 
-已有分享/标签功能的服务器，仅接入密码登录 H5 无需数据库变更；启用钉钉免登需先执行一次 `005-dingtalk.sql`，按[免登升级说明](../backend/DINGTALK-UPGRADE.md)配置，再更新后端和网页。保留原配置和加密密钥。`http.browserOrigin` 留空仍拒绝浏览器 Origin；设置为精确的页面来源，例如 `https://www.shjpnn.com`，不加路径或末尾斜杠。HTTP 联调时必须对应 `http://www.shjpnn.com`。不使用通配符，不删除浏览器 Origin 请求头。
+本版需要依次具备 002～006 数据库结构，包括未启用钉钉的部署。已有服务器按[本次升级说明](../backend/MOBILE-SEARCH-UPGRADE.md)备份、停止本应用、执行尚未执行的 005/006，再更新 JAR 和网页。保留原配置和加密密钥。`http.browserOrigin` 留空仍拒绝浏览器 Origin；设置为精确的页面来源，例如 `https://www.shjpnn.com`，不加路径或末尾斜杠。HTTP 联调时必须对应 `http://www.shjpnn.com`。不使用通配符，不删除浏览器 Origin 请求头。
 
 1. 备份现有帐号管理 JAR，按原方式停止此进程、替换 JAR。
 2. 在原 `config.properties` 中增加 `http.browserOrigin=实际页面来源`，按原方式启动。
@@ -40,4 +41,17 @@ API 固定走同域 `/accmgr-api/`，Apache 转发到本机 18082，不增加跨
 
 使用现有 Java 测试夹具（一次性 H2 内存数据库），允许来源 `http://127.0.0.1:18084`；运行 `node mobile/dev-server.mjs` 提供本地静态页面和同域代理，再运行 `node mobile/check-api.mjs` 创建测试数据并验证接口。开发服务器仅绑定 127.0.0.1，生产环境不部署此脚本或测试帐号。
 
+`desktop/tests/Fixture.java` 的可选第三个参数 `ding` 启用虚构钉钉姓名（不访问真实通讯录），例如 `accmgr.Fixture 18083 http://127.0.0.1:18084 ding`。准备上述测试数据后运行：
+
+```powershell
+New-Item -ItemType Directory -Force output/playwright | Out-Null
+npx --yes --package @playwright/cli playwright-cli -s=mobile-check open http://127.0.0.1:18084
+npx --yes --package @playwright/cli playwright-cli -s=mobile-check run-code --filename mobile/check-ui.js
+npx --yes --package @playwright/cli playwright-cli -s=mobile-check close
+```
+
+浏览器检查涵盖 320/390 像素布局、列表不预取密码、四行复制、剪贴板失败回退与文本清理、姓名搜索、授权/撤销、只读接收人及撤销后的复制拒绝。截图存于 `output/playwright`；确认框在此自动化脚本中自动确认。
+
 发布：`pwsh -File mobile/publish.ps1`，仅打包三个静态文件，不包含测试脚本、密钥或真实数据。
+
+复制兼容：钉钉内优先调用官方 [setClipboard](https://open.dingtalk.com/tools/explorer/jsapi?id=10149)，失败后尝试浏览器 Clipboard API 和选中文本复制命令；均失败才提示长按复制。仅确认成功后显示“已复制”，临时复制节点立即清理。运行 `node --test mobile/check-copy.mjs` 验证成功、失败和切后台等分支；原生桥接在本地使用模拟回调，Android/iPhone 钉钉需真机确认。

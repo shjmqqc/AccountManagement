@@ -7,12 +7,12 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.31/dingtalk.open.js; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>帐号管理</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261013-copy2">
+  <script src="app.js?v=20261013-copy2" defer></script>
 </head>
 <body>
   <main>
-    <header><div><span class="eyebrow">ACCOUNT MANAGEMENT</span><h1>帐号管理</h1></div><button id="logout" hidden>退出</button></header>
+    <header><h1 id="page-title">帐号管理</h1><span class="muted small">随时查找 · 便捷分享</span></header>
     <p id="message" role="status" aria-live="polite"></p>
     <section id="login-panel" class="panel">
       <h2>欢迎回来</h2><p class="muted">使用已有帐号，随时查找与管理分享。</p>
@@ -36,11 +36,9 @@
       </form>
     </section>
     <section id="library" hidden>
-      <div class="toolbar"><span id="identity"></span><button id="change-password">修改密码</button></div>
-      <button id="unbind-dingtalk" type="button" hidden>解除钉钉绑定</button>
-      <nav aria-label="帐号范围"><button data-scope="own" aria-pressed="true">我的帐号</button><button data-scope="received" aria-pressed="false">分享给我</button><button data-scope="outgoing" aria-pressed="false">分享给别人</button></nav>
+      <nav id="scope-tabs" aria-label="帐号范围"><button data-scope="own" aria-pressed="true">我的帐号</button><button data-scope="received" aria-pressed="false">分享给我</button></nav>
       <div class="search"><input id="search" type="search" placeholder="搜索平台、帐号或备注" aria-label="搜索帐号"><button id="refresh">刷新</button></div>
-      <div class="filters"><label>平台<select id="platform-filter"><option value="">全部平台</option></select></label><label>标签<select id="tag-filter"><option value="">全部标签</option></select></label></div>
+      <details id="filter-box"><summary>平台与标签筛选</summary><div class="filters"><label>平台<select id="platform-filter"><option value="">全部平台</option></select></label><label>标签<select id="tag-filter"><option value="">全部标签</option></select></label></div></details>
       <p id="count" class="muted"></p><div id="accounts"></div>
     </section>
     <section id="unbind-panel" class="panel" hidden>
@@ -49,13 +47,32 @@
     </section>
     <section id="detail" class="panel" hidden>
       <button id="back">← 返回列表</button><h2 id="detail-title"></h2><p id="detail-platform" class="muted"></p><div id="detail-tags"></div>
+      <div class="detail-actions"><button id="copy-all" class="primary">整体复制</button><button id="open-sharing">分享管理</button></div>
       <label>登录帐号</label><div class="value-row"><span id="account-login" class="value"></span><button id="copy-login">复制</button></div>
       <label>平台密码</label><div class="secret"><span id="secret" class="value">••••••••</span><div class="actions"><button id="reveal">显示密码</button><button id="copy-password">复制密码</button></div></div>
       <label>平台网址</label><p id="account-url" class="value"></p><label>备注</label><p id="account-notes" class="value notes"></p>
+    </section>
+    <section id="share-panel" class="panel" hidden>
+      <button id="share-back">← 返回帐号</button><h2 id="share-title"></h2>
       <section id="sharing"><h3>分享管理</h3><p class="muted small">接收人只读，可显示和复制密码；你可随时撤销。</p><div id="recipients"></div>
-        <form id="recipient-form"><label>接收人的完整用户名<input id="recipient-name" maxlength="100" required autocomplete="off"></label><button type="submit">查找接收人</button></form><div id="recipient-result"></div>
+        <form id="recipient-form"><label>钉钉姓名或完整用户名<input id="recipient-name" placeholder="输入姓名片段或完整用户名" maxlength="100" required autocomplete="off"></label><button type="submit">查找接收人</button></form><div id="recipient-result"></div>
       </section>
     </section>
+    <section id="my-panel" class="panel" hidden>
+      <label>登录帐号</label><p id="identity" class="value"></p>
+      <label>钉钉绑定</label><p id="binding-status" class="value"></p>
+      <label>钉钉姓名</label><p id="ding-name" class="value"></p>
+      <button id="refresh-binding" class="full">刷新绑定信息</button>
+      <button id="change-password" class="full">修改登录密码</button>
+      <button id="unbind-dingtalk" class="full" hidden>解除钉钉绑定</button>
+      <button id="logout" class="full" hidden>退出登录</button>
+    </section>
+    <pre id="copy-fallback" class="value panel" hidden tabindex="0" aria-label="待复制内容"></pre>
+    <nav id="bottom-nav" aria-label="主要导航" hidden>
+      <button data-page="find" aria-pressed="true">找帐号</button>
+      <button data-page="share" aria-pressed="false">分享</button>
+      <button data-page="my" aria-pressed="false">我的</button>
+    </nav>
   </main>
 </body>
 </html>
