@@ -9,7 +9,7 @@ public partial class UpdateViewModel(IDesktopUpdater updater) : ObservableObject
     private UpdateInfo? available;
     private CancellationTokenSource? cancellation;
     public string CurrentVersion => updater.CurrentVersion;
-    public string Source => DesktopUpdater.FeedUrl;
+    public string Source => updater.IsConfigured ? updater.Source : "未配置更新地址";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanCheck), nameof(CanDownload), nameof(CanRestart))]
     private bool isBusy;
@@ -26,6 +26,7 @@ public partial class UpdateViewModel(IDesktopUpdater updater) : ObservableObject
     public async Task CheckAsync()
     {
         if (!CanCheck) return;
+        if (!updater.IsConfigured) { Status = "自动更新未启用，请在 appsettings.json 中配置 UpdateUrl 后重启应用。"; return; }
         if (!updater.IsInstalled) { Status = "当前为开发版或旧解压版，请先安装新版 Setup.exe，再使用自动更新。"; return; }
         IsBusy = true; available = null; ReleaseNotes = ""; Status = "正在检查更新…";
         try

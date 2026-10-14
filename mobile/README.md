@@ -16,20 +16,20 @@
 
 ## 服务器部署
 
-本版需要依次具备 002～006 数据库结构，包括未启用钉钉的部署。已有服务器按[本次升级说明](../backend/MOBILE-SEARCH-UPGRADE.md)备份、停止本应用、执行尚未执行的 005/006，再更新 JAR 和网页。保留原配置和加密密钥。`http.browserOrigin` 留空仍拒绝浏览器 Origin；设置为精确的页面来源，例如 `https://www.shjpnn.com`，不加路径或末尾斜杠。HTTP 联调时必须对应 `http://www.shjpnn.com`。不使用通配符，不删除浏览器 Origin 请求头。
+本版需要依次具备 002～006 数据库结构，包括未启用钉钉的部署。已有服务器按[本次升级说明](../backend/MOBILE-SEARCH-UPGRADE.md)备份、停止本应用、执行尚未执行的 005/006，再更新 JAR 和网页。保留原配置和加密密钥。`http.browserOrigin` 留空仍拒绝浏览器 Origin；设置为精确的页面来源，例如 `https://accounts.example.com`，不加路径或末尾斜杠。HTTP 联调时必须对应 `http://accounts.example.com`。不使用通配符，不删除浏览器 Origin 请求头。
 
 1. 备份现有帐号管理 JAR，按原方式停止此进程、替换 JAR。
 2. 在原 `config.properties` 中增加 `http.browserOrigin=实际页面来源`，按原方式启动。
-3. 将发布 ZIP 中的 `index.html`、`app.js`、`styles.css` 放至 `/opt/acc_mgr/mobile/`，Apache 用户需要目录遍历和文件读取权限。
-4. 将 `apache2-snippet.conf` 内容合并到 **www.shjpnn.com 实际生效的 VirtualHost 内**，不替换原虚拟主机，不影响现有博客或更新目录。
+3. 将发布 ZIP 中的 `index.html`、`app.js`、`styles.css`、`config.js` 放至静态目录（示例 `/opt/acc_mgr/mobile/`），Apache 用户需要目录遍历和文件读取权限。修改 `config.js` 中的 `apiBase` 为自己的同域 API 代理路径。
+4. 将 `apache2-snippet.conf` 内容合并到 **自己域名实际生效的 VirtualHost 内**，修改 Alias、Directory 和 ProxyPass 地址以匹配实际部署，不替换原虚拟主机。
 5. 确认 Apache 的 `alias`、`proxy`、`proxy_http` 模块可用。只有 `apache2ctl configtest` 为 Syntax OK 后才 reload。
 6. 浏览器访问 `/accmgr-mobile/`，验证登录、密码读取、授权和撤销；免登和绑定需从钉钉内打开测试。登录密码与真实平台密码应通过 HTTPS 传输；HTTP 仅用于测试帐号联调。
 
-API 固定走同域 `/accmgr-api/`，Apache 转发到本机 18082，不增加跨域访问配置；前端不允许任意指定服务器。更新页面时一起替换三个文件。Apache 示例禁用缓存，后端 API 同样返回 no-store。
+API 默认走同域 `/accmgr-api/`，可在 `config.js` 修改路径，Apache/Nginx 同步修改代理路径及后端地址。仍不开放跨域请求。更新页面时部署四个文件并保留自定义配置；旧部署首次升级须补齐 `config.js`。Apache 示例禁用缓存，后端 API 同样返回 no-store。详见[部署地址配置](../docs/deployment-settings.md)。
 
 ## 钉钉后台
 
-创建“企业内部应用 → H5 微应用”，应用名建议“帐号管理”。将移动端首页设为 `https://www.shjpnn.com/accmgr-mobile/`（以实际可访问的协议为准），PC 首页可使用相同地址，设置可见范围为需要使用的成员，再发布到工作台。具体字段以当前开发者后台为准。
+创建“企业内部应用 → H5 微应用”，应用名建议“帐号管理”。将移动端首页设为 `https://accounts.example.com/accmgr-mobile/`（以实际可访问的协议为准），PC 首页可使用相同地址，设置可见范围为需要使用的成员，再发布到工作台。具体字段以当前开发者后台为准。
 
 工作台打开后，未启用免登时使用原帐号密码；启用后通过钉钉授权码验证身份，未绑定者可勾选绑定并验证密码。系统内帐号与分享权限仍由后端验证，钉钉可见范围不代替系统授权。支持密码确认解绑，解绑撤销所有现有会话；主动退出会暂停当前页面会话的自动登录。不要把 AppSecret 写进网页。
 

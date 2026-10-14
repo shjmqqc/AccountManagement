@@ -57,6 +57,7 @@ internal static class Program
 
     private static async Task Run(string endpoint)
     {
+        await DeploymentChecks.Run(Check);
         await AlignmentChecks.Run(Check, Capture);
         await BatchShareChecks.Failures(Check);
         await UpdateChecks.Run(Check, Capture);
@@ -129,6 +130,8 @@ internal static class Program
         vm.SelectedAccount = vm.Accounts.Single(a => a.Id == accountId);
         string? copied = null; await vm.CopyPasswordAsync(value => copied = value);
         Check(copied == "测试密码🔐" && !vm.PasswordVisible, "Copy without revealing; no real clipboard modified in tests");
+        await vm.CopyAllAsync(value => copied = value);
+        Check(copied == $"【平台名称】{vm.DetailPlatform}\n【地址】{vm.DetailUrl}\n【帐号】{vm.SelectedAccount.Login}\n【密码】测试密码🔐" && !vm.PasswordVisible, "Whole-account copy matches H5 four-line format without revealing");
         await window.CopyRowAsync(vm.Accounts.Single(a => a.Id == secondId), false, value => copied = value);
         Check(copied == "personal@example.com" && vm.SelectedAccount?.Id == secondId, "Inline copy selects the clicked row");
         await window.CopyRowAsync(vm.Accounts.Single(a => a.Id == accountId), true, value => copied = value);
@@ -285,7 +288,8 @@ internal static class Program
         using var handler = new AdminPasswordHandler(); using var auditApi = new ApiClient(handler);
         var auditVm = new MainViewModel(auditApi, me) { ViewedUser = target, SelectedAccount = new AccountRecord(accountId, platformId, "", "test", "") };
         await auditVm.RevealPasswordCommand.ExecuteAsync(null); await auditVm.CopyPasswordAsync(_ => { });
-        Check(handler.Actions.SequenceEqual(new[] { "view", "copy" }), "Admin reveal and copy use distinct audit actions");
+        await auditVm.CopyAllAsync(_ => { });
+        Check(handler.Actions.SequenceEqual(new[] { "view", "copy", "copy" }), "Admin reveal, password and whole-account copy use correct audit actions");
     }
 
     private static async Task SharingFlow(ApiClient owner, ApiClient receiver, MainWindow ownWindow, string accountId, string platformId)
@@ -338,6 +342,8 @@ internal static class Program
         vm.HidePassword();
         string? copied = null; await vm.CopyPasswordAsync(value => copied = value);
         Check(copied == "测试密码🔐", "Shared password copy");
+        await vm.CopyAllAsync(value => copied = value);
+        Check(copied == $"【平台名称】{vm.SelectedAccount.PlatformName}\n【地址】{vm.SelectedAccount.PlatformUrl}\n【帐号】{vm.SelectedAccount.Login}\n【密码】测试密码🔐" && !vm.PasswordVisible, "Shared whole-account copy uses authorized password and platform");
         Capture(sharedWindow, "shared-with-me", 1320, 820);
         Capture(sharedWindow, "shared-with-me-small", 1060, 660);
         await ExpectApi(404, () => receiver.SaveAccountAsync(account, platformId, account.Name, account.Login, account.Notes, "tamper"));
@@ -348,7 +354,7 @@ internal static class Program
         await outgoing.SwitchUserAsync(null);
         Check(!outgoing.ShowingOutgoing && outgoing.Accounts.Any(a => a.Id == accountId), "Revoked account remains in own library");
         copied = null;
-        await vm.CopyPasswordAsync(value => copied = value);
+        await vm.CopyAllAsync(value => copied = value);
         Check(copied is null && !vm.PasswordVisible && vm.Accounts.Count == 0, "Revocation prevents copy and clears stale shared UI");
         await vm.RefreshCommand.ExecuteAsync(null);
         Check(vm.Accounts.Count == 0, "Revoked entry removed on refresh");

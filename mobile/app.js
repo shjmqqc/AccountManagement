@@ -1,6 +1,18 @@
 'use strict';
 // Same-origin Apache proxy; no credentials or DingTalk app secrets belong in this file.
-const API = '/accmgr-api/';
+function configuredApiBase(config) {
+  const path = config?.apiBase;
+  if (typeof path !== 'string' || !/^\/(?:[A-Za-z0-9_-]+\/)+$/.test(path))
+    throw new Error('config.js 的 apiBase 须为同域代理路径，例如 /accmgr-api/。');
+  return path;
+}
+const API = (() => {
+  try { return configuredApiBase(window.ACCMGR_CONFIG); }
+  catch (error) {
+    document.getElementById('message').textContent = '服务器配置错误，请联系管理员检查 config.js。';
+    throw error;
+  }
+})();
 const $ = id => document.getElementById(id);
 let token = '', user = null, scope = 'own', accounts = [], platforms = [], current = null;
 let busy = false, mustChange = false, secretVersion = 0;

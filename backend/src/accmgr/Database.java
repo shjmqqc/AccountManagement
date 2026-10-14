@@ -11,20 +11,29 @@ final class Database {
 
     static Database mysql(Properties config) throws Exception {
         Class.forName("com.mysql.jdbc.Driver");
-        int port = Integer.parseInt(config.getProperty("db.port", "3306"));
-        if (port < 1 || port > 65535) throw new IllegalArgumentException("Invalid database port");
+        String url = mysqlUrl(config);
         Properties options = new Properties();
         options.setProperty("user", required(config, "db.user"));
         options.setProperty("password", required(config, "db.password"));
         options.setProperty("useUnicode", "true");
         options.setProperty("characterEncoding", "UTF-8");
         options.setProperty("connectionCollation", "utf8mb4_unicode_ci");
-        options.setProperty("useSSL", "false"); // Loopback only.
+        options.setProperty("useSSL", "false"); // Use loopback or a trusted private connection.
         options.setProperty("connectTimeout", "5000");
         options.setProperty("socketTimeout", "10000");
         options.setProperty("jdbcCompliantTruncation", "true");
-        String url = "jdbc:mysql://127.0.0.1:" + port + "/account_management";
         return new Database(() -> DriverManager.getConnection(url, options));
+    }
+
+    static String mysqlUrl(Properties config) {
+        int port = Integer.parseInt(config.getProperty("db.port", "3306"));
+        if (port < 1 || port > 65535) throw new IllegalArgumentException("Invalid database port");
+        String host = config.getProperty("db.host", "127.0.0.1").trim();
+        String name = config.getProperty("db.name", "account_management").trim();
+        if (!host.matches("[A-Za-z0-9][A-Za-z0-9.-]*|\\[[0-9A-Fa-f:]+\\]"))
+            throw new IllegalArgumentException("Invalid db.host (hostname, IPv4 or bracketed IPv6 required)");
+        if (!name.matches("[A-Za-z0-9_]+")) throw new IllegalArgumentException("Invalid db.name");
+        return "jdbc:mysql://" + host + ":" + port + "/" + name;
     }
 
     static String required(Properties config, String name) {

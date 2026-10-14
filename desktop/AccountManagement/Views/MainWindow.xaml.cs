@@ -159,6 +159,7 @@ public partial class MainWindow : FluentWindow
         await ViewModel.RunAsync(() => { CopyText(account.Login); return Task.CompletedTask; }, "登录帐号已复制");
     }
     private async void CopyPassword_Click(object sender, RoutedEventArgs e) => await ViewModel.CopyPasswordAsync(CopyText);
+    private async void CopyAll_Click(object sender, RoutedEventArgs e) => await ViewModel.CopyAllAsync(CopyText);
     private void ToggleDetails_Click(object sender, RoutedEventArgs e) => SetDetailsVisible(DetailPanel.Visibility != Visibility.Visible);
     internal void SetDetailsVisible(bool visible)
     {

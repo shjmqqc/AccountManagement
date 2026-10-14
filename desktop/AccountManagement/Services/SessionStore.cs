@@ -8,7 +8,7 @@ namespace AccountManagement.Services;
 public sealed class SessionStore
 {
     private readonly string file;
-    public const string DefaultEndpoint = "http://www.shjpnn.com:18082/";
+    public static string DefaultEndpoint => DeploymentSettings.Current.ServerUrl;
     private string EndpointFile => Path.Combine(Path.GetDirectoryName(file)!, "server.txt");
     public SessionStore(string? directory = null)
     {

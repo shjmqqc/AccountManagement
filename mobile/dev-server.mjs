@@ -1,7 +1,7 @@
 // Local-only static host and same-origin API proxy. No dependencies, never used in production.
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
-const files = {'/': ['index.html','text/html'], '/index.html':['index.html','text/html'], '/app.js':['app.js','text/javascript'], '/styles.css':['styles.css','text/css']};
+const files = {'/': ['index.html','text/html'], '/index.html':['index.html','text/html'], '/config.js':['config.js','text/javascript'], '/app.js':['app.js','text/javascript'], '/styles.css':['styles.css','text/css']};
 http.createServer(async (req,res) => {
   if (req.url.startsWith('/accmgr-api/')) {
     const upstream = http.request({hostname:'127.0.0.1',port:18083,path:req.url.slice('/accmgr-api'.length),method:req.method,headers:req.headers}, response => {

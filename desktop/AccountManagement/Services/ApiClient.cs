@@ -18,7 +18,7 @@ public sealed class ApiClient : IDisposable
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
     private readonly HttpClient http;
     private string? token;
-    public string Endpoint { get; private set; } = "http://127.0.0.1:18082/";
+    public string Endpoint { get; private set; } = DeploymentSettings.Current.ServerUrl;
 
     public ApiClient(HttpMessageHandler? handler = null)
     {

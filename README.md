@@ -51,7 +51,7 @@ Excel 导入预览与逐行结果：
 | 批量分享 | Windows 勾选多个本人帐号，授权多位接收人；已有授权跳过，逐项显示结果 |
 | 彩色标签 | 自定义名称、六种颜色、同用户复用；多标签展示与单标签筛选；Windows 修改名称/颜色、删除标签并保留帐号 |
 | Excel 导入 | Windows 下载模板、预览校验、逐行导入 `.xlsx`；重复帐号跳过且不修改，显示行号及结果 |
-| 密码操作 | 默认隐藏；显示与复制；切换帐号或窗口失去焦点后隐藏 |
+| 密码操作 | 默认隐藏；显示与复制；Windows/H5 支持平台、地址、帐号、密码四行整体复制；切换帐号或窗口失去焦点后隐藏 |
 | 注册与登录 | 邀请制注册；7 天会话；修改登录密码；多设备登录 |
 | 邀请管理 | 一次性邀请码，7 天有效；手动发放与撤销 |
 | 用户管理 | 停用、恢复、重置临时密码；重置后强制改密并撤销旧会话 |
@@ -68,7 +68,7 @@ Excel 导入预览与逐行结果：
 
 | 能力 | Windows | 钉钉 H5 |
 |---|---|---|
-| 查找、查看、复制帐号与密码 | 支持 | 支持，含四行整体复制 |
+| 查找、查看、复制帐号与密码 | 支持，含四行整体复制 | 支持，含四行整体复制 |
 | 单帐号分享与撤销 | 支持 | 支持 |
 | 批量分享、Excel 导入 | 支持 | 不提供 |
 | 帐号、平台和标签维护 | 支持 | 不提供录入与修改入口 |
@@ -156,6 +156,8 @@ $dotnet = (Get-Command dotnet).Source
 
 ## 部署与连接
 
+**部署地址均可配置**：Windows 使用 `appsettings.json` 配置默认 API 和更新源，H5 使用 `config.js` 配置同域 API 代理路径，后端使用 `config.properties` 配置监听、浏览器来源和数据库地址。详见[部署地址配置](docs/deployment-settings.md)。这些入口为 v1.1.8 之后的源码改动；旧版安装包不包含。Windows 随包默认 API 为 `http://www.shjpnn.com:18082/`，更新源为 `http://www.shjpnn.com/updates/windows/`；其他部署者按说明修改配置。
+
 首次部署请按 [后端部署说明](backend/README.md) 操作，流程为：
 
 1. 使用 [001-create-database.sql](database/001-create-database.sql) 创建独立数据库。
@@ -187,7 +189,7 @@ java -Xms16m -Xmx128m -cp 'account-management.jar:lib/*' accmgr.Main serve confi
 
 没有默认管理员密码。工具登录帐号、Linux 帐号与 MySQL 帐号是不同的帐号。
 
-H5 部署见 [移动端说明](mobile/README.md)：上传三个静态文件、配置 `/accmgr-api/` 同域转发和 `http.browserOrigin`，再将页面地址设置为钉钉内部应用首页。免登默认关闭；启用时将 CorpId、ClientId、ClientSecret 写入后端配置，不写入网页。绑定选项在钉钉内打开且后端已启用免登时显示。
+H5 部署见 [移动端说明](mobile/README.md)：上传四个静态文件（含 `config.js`）、配置匹配的同域转发和 `http.browserOrigin`，再将页面地址设置为钉钉内部应用首页。免登默认关闭；启用时将 CorpId、ClientId、ClientSecret 写入后端配置，不写入网页。绑定选项在钉钉内打开且后端已启用免登时显示。
 
 ## 数据与权限
 

@@ -194,17 +194,23 @@ public partial class MainViewModel : ObservableObject
         }, "密码已显示");
     }
 
-    public async Task CopyPasswordAsync(Action<string> copy)
+    public Task CopyPasswordAsync(Action<string> copy) => CopySecretAsync(copy, false);
+    public Task CopyAllAsync(Action<string> copy) => CopySecretAsync(copy, true);
+
+    private async Task CopySecretAsync(Action<string> copy, bool wholeAccount)
     {
         var selected = SelectedAccount;
         var version = selectionVersion;
         if (selected is null) return;
+        var platform = DetailPlatform;
+        var url = DetailUrl;
         await RunAsync(async () =>
         {
             var password = ShowingShared ? await api.SharedPasswordAsync(selected.Id, "copy") : ViewedUser is null ? await api.PasswordAsync(selected.Id)
                 : await api.UserPasswordAsync(ViewedUser.Id, selected.Id, "copy");
-            if (version == selectionVersion && SelectedAccount?.Id == selected.Id) copy(password);
-        }, "密码已复制");
+            if (version == selectionVersion && SelectedAccount?.Id == selected.Id)
+                copy(wholeAccount ? $"【平台名称】{platform}\n【地址】{url}\n【帐号】{selected.Login}\n【密码】{password}" : password);
+        }, wholeAccount ? "帐号信息已整体复制" : "密码已复制");
     }
 
     public void ClearData()

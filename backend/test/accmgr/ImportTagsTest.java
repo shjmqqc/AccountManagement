@@ -25,6 +25,15 @@ public final class ImportTagsTest {
     }
     static JsonObject row(String platform, String name) { return body("platform_name", platform, "platform_url", "https://example.com", "name", name, "login", "00123", "password", " 密码🔐 ", "notes", "导入", "tag_names", Arrays.asList("测试", "正式")); }
     public static void main(String[] args) throws Exception {
+        Properties config = new Properties();
+        check(mysqlUrl(config).equals("jdbc:mysql://127.0.0.1:3306/account_management"), "Legacy database defaults");
+        config.setProperty("db.host", "mysql.internal"); config.setProperty("db.port", "3307"); config.setProperty("db.name", "team_accounts");
+        check(mysqlUrl(config).equals("jdbc:mysql://mysql.internal:3307/team_accounts"), "Configured database endpoint");
+        for (String bad : new String[]{"", "localhost/other", "localhost?x=y", "user@localhost", "localhost:3307"}) {
+            config.setProperty("db.host", bad);
+            try { mysqlUrl(config); throw new AssertionError("Unsafe database host accepted"); }
+            catch (IllegalArgumentException expected) { checks++; }
+        }
         Class.forName("org.h2.Driver");
         db = new Database(() -> DriverManager.getConnection("jdbc:h2:mem:importtags;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", ""));
         try (Connection c = db.connections.open(); Statement s = c.createStatement()) {

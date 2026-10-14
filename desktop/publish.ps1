@@ -1,4 +1,4 @@
-param([string]$Dotnet = '', [string]$Version = '1.1.8')
+param([string]$Dotnet = '', [string]$Version = '1.1.9')
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 if (-not $Dotnet) { $Dotnet = Join-Path $PSScriptRoot '../.tools/dotnet/dotnet.exe' }

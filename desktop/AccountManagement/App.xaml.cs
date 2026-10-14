@@ -16,6 +16,13 @@ public partial class App : Application
         VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         using var instance = new SingleInstance();
         if (!instance.IsOwner) { instance.RequestActivation(); return; }
+        try { _ = DeploymentSettings.Current; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+        {
+            System.Windows.MessageBox.Show("无法读取服务器配置。请检查应用目录或 %LOCALAPPDATA%\\AccountManagement 中的 appsettings.json。\n" + error.Message,
+                "配置错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
         var app = new App(); app.InitializeComponent();
         var activationTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         activationTimer.Tick += (_, _) =>

@@ -1,5 +1,7 @@
 # 帐号管理最小后端
 
+部署地址配置见[统一说明](../docs/deployment-settings.md)。`config.properties` 可设置 `http.host`、`http.port`、`http.browserOrigin`、`db.host`、`db.port`、`db.name`；旧配置省略数据库主机和库名时保持原默认值。更换库名时同时调整建库、授权和迁移脚本。
+
 本阶段实现 Windows 与小程序共同使用的核心 API，尚非完整 V1 产品。服务器既有服务不需要修改或重启。
 
 Windows 1.1.8 新增 Excel 导入、标签改名/改色/删除，须先更新本后端，见 [IMPORT-TAGS-UPGRADE.md](IMPORT-TAGS-UPGRADE.md)。已完成 006 迁移无需新增 SQL。
